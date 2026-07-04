@@ -68,13 +68,13 @@
   <header>
     <div class="logo">🛡️</div>
     <div class="eyebrow">Pitch Deck Gallery</div>
-    <h1>Disinfo Analyzer<span class="grad">.</span><br>Twelve ways to tell the story</h1>
-    <p class="sub">One product — a multi-agent AI that flags clickbait, emotional manipulation, political bias, and conspiracy theories on any web page — presented in four visual styles and tuned for eight audiences. Every deck is a self-contained 16:9 HTML file with keyboard navigation and print-to-PDF built in.</p>
+    <h1>Disinfo Analyzer<span class="grad">.</span><br>Thirteen ways to tell the story</h1>
+    <p class="sub">One product — a multi-agent AI that flags clickbait, emotional manipulation, political bias, and conspiracy theories on any web page — presented in four visual styles, tuned for eight audiences, plus a source-grounded clay technical study. Every deck is a self-contained 16:9 HTML file with keyboard navigation and print-to-PDF built in.</p>
     <div class="chips">
       <span class="chip"><span class="dot" style="background:var(--c1)"></span> CrewAI · 4 Agents</span>
       <span class="chip"><span class="dot" style="background:var(--c2)"></span> FastAPI Streaming</span>
       <span class="chip"><span class="dot" style="background:var(--c3)"></span> Chrome Extension</span>
-      <span class="chip"><span class="dot" style="background:var(--c5)"></span> 12 Decks</span>
+      <span class="chip"><span class="dot" style="background:var(--c5)"></span> 13 Decks</span>
     </div>
   </header>
 
@@ -83,6 +83,9 @@
 
   <h2 class="sec">By Audience · Modern-gradient look</h2>
   <div class="grid" id="audiences"></div>
+
+  <h2 class="sec">Custom · Clay Technical Study</h2>
+  <div class="grid" id="custom"></div>
 
   <div class="note">
     <b>Using a deck.</b> Click any card to open it. Navigate with <code>← →</code>, <code>Space</code>, or the on-screen dots; press <code>F</code> for fullscreen.
@@ -127,8 +130,12 @@
         </div>
       </div>
     </div>`;
+  const custom = [
+    {f:"decks/clay-technical.html", t:"Technical Pitch — Clay", b:"5-min", d:"A 5-slide, source-grounded technical pitch in a tactile clay aesthetic. Desktop-first, muted palette, molded 3D panels."},
+  ];
   document.getElementById("styles").innerHTML = styles.map(card).join("");
   document.getElementById("audiences").innerHTML = audiences.map(card).join("");
+  document.getElementById("custom").innerHTML = custom.map(card).join("");
 </script>
 </body>
 </html>

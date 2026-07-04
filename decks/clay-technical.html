@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disinfo Analyzer — Technical Pitch (Clay)</title>
+<style>
+  :root{
+    --base:#191c22; --base2:#131519;
+    --panel:#333844; --panel-hi:#414856; --panel-lo:#282c34;
+    --ink:#f0efe9; --muted:#b1b5bf; --faint:#787d88;
+    --terra:#cf7e59; --terra-lo:#b96a47;
+    --steel:#7c99b6; --sand:#cabfac; --sage:#8fa88c;
+    --ff-d:"Trebuchet MS","Segoe UI",system-ui,sans-serif;
+    --ff-b:system-ui,-apple-system,"Segoe UI",sans-serif;
+    --ff-m:"Cascadia Code",Consolas,"SFMono-Regular",monospace;
+    /* clay light model: highlight top-left, shadow bottom-right */
+    --clay:
+      -0.4cqw -0.4cqw 1cqw rgba(255,255,255,.09),
+       0.7cqw 0.9cqw 2cqw rgba(0,0,0,.62),
+       inset 0.16cqw 0.16cqw 0.3cqw rgba(255,255,255,.1),
+       inset -0.24cqw -0.28cqw 0.55cqw rgba(0,0,0,.5);
+    --clay-sm:
+      -0.24cqw -0.24cqw 0.6cqw rgba(255,255,255,.08),
+       0.4cqw 0.5cqw 1.1cqw rgba(0,0,0,.55),
+       inset 0.12cqw 0.12cqw 0.24cqw rgba(255,255,255,.1),
+       inset -0.14cqw -0.16cqw 0.34cqw rgba(0,0,0,.46);
+    --clay-inset:
+       inset 0.34cqw 0.4cqw 0.8cqw rgba(0,0,0,.62),
+       inset -0.22cqw -0.22cqw 0.55cqw rgba(255,255,255,.07);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:var(--ff-b); color:var(--ink);
+    background:
+      radial-gradient(70cqw 50cqw at 22% 8%, rgba(255,255,255,.045), transparent 60%),
+      radial-gradient(80cqw 60cqw at 92% 100%, rgba(0,0,0,.35), transparent 55%),
+      linear-gradient(160deg, var(--base), var(--base2));
+    background-attachment:fixed;
+    overflow:hidden; display:grid; place-items:center; height:100vh;
+  }
+  .viewport{ width:100vw; height:100vh; display:grid; place-items:center }
+  .stage{
+    position:relative;
+    width:min(100vw,177.78vh); height:min(56.25vw,100vh);
+    aspect-ratio:16/9; overflow:hidden;
+    border-radius:clamp(0px,1.1vh,20px);
+    box-shadow:0 30px 90px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.03);
+    container-type:inline-size;
+  }
+  .slides{position:absolute; inset:0}
+  .slide{
+    position:absolute; inset:0; display:none;
+    padding:5.4% 6.4%;
+    grid-template-columns:1.05fr 1fr; gap:4cqw; align-items:center;
+    animation:rise .6s cubic-bezier(.2,.75,.2,1);
+  }
+  .slide.active{ display:grid }
+  @keyframes rise{ from{opacity:0; transform:translateY(1.6cqw)} to{opacity:1; transform:none} }
+  @media (prefers-reduced-motion:reduce){ .slide{animation:none} }
+
+  /* ---- left column: content ---- */
+  .idx{ font-family:var(--ff-m); font-size:1.25cqw; letter-spacing:.3em; color:var(--faint); display:flex; align-items:center; gap:1cqw; margin-bottom:1.6cqw }
+  .idx b{ color:var(--terra); font-weight:700 }
+  .idx .rule{ flex:1; height:1px; background:linear-gradient(90deg,rgba(255,255,255,.14),transparent) }
+  .eyebrow{ font-family:var(--ff-m); font-size:1.12cqw; letter-spacing:.28em; text-transform:uppercase; color:var(--steel); font-weight:700 }
+  h2{ font-family:var(--ff-d); font-size:3.9cqw; line-height:1.02; font-weight:700; letter-spacing:-.015em; margin:.8cqw 0 1.5cqw; color:var(--ink) }
+  .lead{ font-size:1.58cqw; line-height:1.4; color:var(--muted); max-width:46cqw; margin-bottom:2cqw }
+  .lead b{ color:var(--ink); font-weight:600 }
+
+  ul{ list-style:none; display:flex; flex-direction:column; gap:1.15cqw }
+  ul li{ display:flex; gap:1.3cqw; align-items:flex-start; font-size:1.4cqw; line-height:1.36; color:var(--muted) }
+  ul li b{ color:var(--ink); font-weight:600 }
+  .knob{ flex:none; width:1.7cqw; height:1.7cqw; border-radius:50%; margin-top:.2cqw;
+    background:linear-gradient(145deg,var(--panel-hi),var(--panel-lo)); box-shadow:var(--clay-sm);
+    display:grid; place-items:center }
+  .knob::after{ content:""; width:.55cqw; height:.55cqw; border-radius:50%; background:var(--steel); box-shadow:0 0 .4cqw rgba(124,153,182,.6) }
+  .knob.crit::after{ background:var(--terra); box-shadow:0 0 .5cqw rgba(207,126,89,.7) }
+
+  /* ---- right column: clay stage ---- */
+  .viz{ position:relative; height:100%; display:grid; place-items:center }
+  .plate{ position:relative; width:100%; aspect-ratio:1/.86; border-radius:3cqw;
+    background:linear-gradient(150deg,var(--panel-hi),var(--panel-lo)); box-shadow:var(--clay);
+    padding:3cqw; overflow:hidden }
+  .plate::before{ content:""; position:absolute; inset:0; background:radial-gradient(60% 45% at 30% 18%, rgba(255,255,255,.05), transparent 70%); pointer-events:none }
+
+  /* generic molded chip */
+  .chip{ background:linear-gradient(145deg,var(--panel-hi),var(--panel-lo)); border-radius:1.4cqw; box-shadow:var(--clay-sm) }
+  .line{ height:.75cqw; border-radius:1cqw; background:linear-gradient(90deg,rgba(255,255,255,.13),rgba(255,255,255,.04)); box-shadow:var(--clay-inset) }
+
+  /* slide 1 — chaos of text shards */
+  .chaos{ position:absolute; inset:2.4cqw }
+  .shard{ position:absolute; width:15cqw; padding:1.15cqw; display:flex; flex-direction:column; gap:.6cqw }
+  .shard .line:nth-child(2){ width:72% } .shard .line:nth-child(3){ width:52% }
+  .tagline{ position:absolute; bottom:2.4cqw; left:3cqw; right:3cqw; font-family:var(--ff-m); font-size:1.15cqw; color:var(--faint); letter-spacing:.12em; text-align:center }
+
+  /* slide 2 — funnel to ordered trays */
+  .funnel{ display:grid; grid-template-columns:1fr; gap:1.5cqw; width:100% }
+  .tray{ display:flex; align-items:center; gap:1.4cqw; padding:1.5cqw 1.8cqw; border-radius:1.6cqw;
+    background:linear-gradient(145deg,var(--panel-hi),var(--panel-lo)); box-shadow:var(--clay-sm) }
+  .tray .dotc{ width:2.3cqw; height:2.3cqw; border-radius:.9cqw; flex:none; display:grid; place-items:center; font-size:1.3cqw;
+    background:linear-gradient(145deg,var(--panel-hi),var(--panel-lo)); box-shadow:var(--clay-sm) }
+  .tray .tl{ font-weight:700; font-size:1.5cqw; color:var(--ink) } .tray .ts{ font-size:1.2cqw; color:var(--muted); font-family:var(--ff-m) }
+
+  /* slide 3 — desktop workspace */
+  .win{ width:100%; border-radius:2cqw; overflow:hidden; box-shadow:var(--clay); background:var(--panel-lo) }
+  .winbar{ display:flex; align-items:center; gap:.9cqw; padding:1.2cqw 1.6cqw; background:linear-gradient(145deg,var(--panel-hi),var(--panel)) }
+  .winbar i{ width:1cqw; height:1cqw; border-radius:50%; box-shadow:var(--clay-inset) }
+  .winbar .t{ margin-left:1cqw; font-family:var(--ff-m); font-size:1.15cqw; color:var(--muted) }
+  .winbody{ padding:2cqw; display:flex; flex-direction:column; gap:1.4cqw }
+  .btn-clay{ text-align:center; padding:1.3cqw; border-radius:1.3cqw; font-weight:700; font-size:1.5cqw; color:var(--ink);
+    background:linear-gradient(145deg,var(--terra),var(--terra-lo)); box-shadow:var(--clay-sm) }
+  .log{ border-radius:1.2cqw; padding:1.4cqw 1.6cqw; box-shadow:var(--clay-inset); background:var(--base2); display:flex; flex-direction:column; gap:.85cqw }
+  .log .row{ font-family:var(--ff-m); font-size:1.2cqw; color:var(--muted); display:flex; gap:.9cqw; align-items:center }
+  .log .row::before{ content:""; width:.9cqw; height:.9cqw; border-radius:.3cqw; background:var(--steel); flex:none; box-shadow:0 0 .3cqw rgba(124,153,182,.5) }
+  .log .row.done::before{ background:var(--sage) }
+  .verdicts{ display:grid; grid-template-columns:1fr 1fr; gap:1cqw }
+  .vd{ display:flex; align-items:center; justify-content:space-between; padding:1cqw 1.3cqw; border-radius:1.1cqw; box-shadow:var(--clay-sm); background:linear-gradient(145deg,var(--panel-hi),var(--panel-lo)) }
+  .vd span{ font-size:1.2cqw; color:var(--muted) } .vd b{ font-size:1.25cqw; color:var(--ink); font-family:var(--ff-m) }
+
+  /* slide 4 — architecture diagram */
+  .arch{ position:absolute; inset:2.6cqw; display:flex; flex-direction:column; justify-content:space-between }
+  .node{ padding:1.15cqw 1.4cqw; border-radius:1.3cqw; box-shadow:var(--clay-sm); background:linear-gradient(145deg,var(--panel-hi),var(--panel-lo));
+    display:flex; flex-direction:column; gap:.25cqw }
+  .node .nt{ font-weight:700; font-size:1.35cqw; color:var(--ink) } .node .ns{ font-family:var(--ff-m); font-size:1.05cqw; color:var(--faint) }
+  .node.io{ align-items:center; text-align:center; background:linear-gradient(145deg,var(--panel-hi),var(--panel-lo)) }
+  .node.brain{ border:0; background:linear-gradient(145deg,#3a4150,#2a2f3a) }
+  .node.brain .nt{ color:var(--steel) }
+  .models{ display:grid; grid-template-columns:1fr 1fr; gap:1cqw }
+  .node.mdl .nt{ font-size:1.2cqw } .node.mdl.multi{ box-shadow:var(--clay-sm), 0 0 0 .12cqw rgba(207,126,89,.5) }
+  .node.mdl.multi .nt{ color:var(--terra) }
+  .flow{ text-align:center; color:var(--faint); font-size:1.6cqw; line-height:.6 }
+
+  /* slide 5 — monitor */
+  .setup{ display:flex; flex-direction:column; align-items:center; gap:0; width:100% }
+  .monitor{ width:82%; border-radius:1.8cqw; padding:1.3cqw; background:linear-gradient(145deg,var(--panel-hi),var(--panel-lo)); box-shadow:var(--clay) }
+  .screen{ border-radius:1cqw; aspect-ratio:16/10; box-shadow:var(--clay-inset); background:linear-gradient(150deg,var(--base2),#191c22); padding:1.6cqw; display:flex; flex-direction:column; gap:1cqw; justify-content:center }
+  .screen .bar{ height:1.1cqw; border-radius:1cqw; background:linear-gradient(90deg,rgba(255,255,255,.12),rgba(255,255,255,.03)); box-shadow:var(--clay-inset) }
+  .screen .bar.a{ width:60%; background:linear-gradient(90deg,var(--terra),transparent) }
+  .screen .bar.b{ width:85% } .screen .bar.c{ width:45% }
+  .stand{ width:9cqw; height:2.4cqw; margin-top:-0.3cqw; background:linear-gradient(145deg,var(--panel),var(--panel-lo)); box-shadow:var(--clay-sm); border-radius:0 0 1cqw 1cqw }
+  .base-bar{ width:20cqw; height:1.4cqw; border-radius:1cqw; background:linear-gradient(145deg,var(--panel-hi),var(--panel-lo)); box-shadow:var(--clay-sm); margin-top:.7cqw }
+  .nomob{ position:absolute; right:3.2cqw; bottom:3.2cqw; width:7cqw; height:11cqw; border-radius:1.4cqw; box-shadow:var(--clay-sm); background:linear-gradient(145deg,var(--panel),var(--panel-lo)); opacity:.5; display:grid; place-items:center }
+  .nomob::after{ content:""; position:absolute; width:9cqw; height:.5cqw; background:var(--terra-lo); border-radius:1cqw; transform:rotate(-45deg); box-shadow:0 0 .5cqw rgba(207,126,89,.5) }
+  .nomob-l{ position:absolute; right:2.4cqw; bottom:1.4cqw; font-family:var(--ff-m); font-size:1cqw; color:var(--faint); letter-spacing:.1em }
+
+  /* title slide 0 not used — 5 content slides only */
+
+  /* footer + chrome */
+  .brand{ position:absolute; left:6.8%; bottom:4%; display:flex; align-items:center; gap:.9cqw; font-family:var(--ff-m); font-size:1.1cqw; letter-spacing:.12em; color:var(--faint) }
+  .brand .m{ width:1.5cqw; height:1.5cqw; border-radius:.45cqw; background:linear-gradient(145deg,var(--terra),var(--terra-lo)); box-shadow:var(--clay-sm) }
+  .progress{ position:absolute; top:0; left:0; height:.35cqw; background:linear-gradient(90deg,var(--terra),var(--sand)); z-index:20; transition:width .45s ease }
+
+  .nav{ position:fixed; bottom:2.1vh; left:50%; transform:translateX(-50%); z-index:50; display:flex; align-items:center; gap:14px;
+    padding:8px 14px; border-radius:999px; background:#2a2e37; box-shadow:6px 8px 20px rgba(0,0,0,.5), -3px -3px 10px rgba(255,255,255,.04) }
+  .nav button{ background:none; border:0; color:var(--ink); cursor:pointer; width:30px; height:30px; border-radius:50%; font-size:16px; display:grid; place-items:center }
+  .nav button:hover{ background:rgba(255,255,255,.08) }
+  .dots{ display:flex; gap:8px }
+  .dots i{ width:9px; height:9px; border-radius:50%; background:#3b404b; box-shadow:inset 2px 2px 4px rgba(0,0,0,.5); cursor:pointer; transition:.25s }
+  .dots i.on{ width:24px; border-radius:999px; background:linear-gradient(90deg,var(--terra),var(--sand)); box-shadow:none }
+  .counter{ font-family:var(--ff-m); font-size:12px; color:var(--faint); min-width:52px; text-align:center }
+  .hint{ position:fixed; top:2vh; right:2vw; z-index:50; font-family:var(--ff-m); font-size:11px; color:var(--faint); opacity:.7 }
+
+  @media print{
+    @page{ size:13.333in 7.5in; margin:0 }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important }
+    html,body{ height:auto; overflow:visible; display:block }
+    body{ background:var(--base) }
+    .viewport{ display:block; width:auto; height:auto }
+    .stage{ width:auto; height:auto; aspect-ratio:auto; box-shadow:none; border-radius:0; overflow:visible }
+    .slides{ position:static }
+    .slide{ position:relative !important; display:grid !important; width:13.333in; height:7.5in; overflow:hidden; animation:none;
+      page-break-after:always; break-after:page;
+      background:radial-gradient(70cqw 50cqw at 22% 8%, rgba(255,255,255,.045), transparent 60%), linear-gradient(160deg,var(--base),var(--base2)) }
+    .slide:last-of-type{ page-break-after:avoid; break-after:auto }
+    .nav,.hint,.progress,.brand{ display:none !important }
+  }
+</style>
+</head>
+<body>
+<div class="viewport">
+  <div class="stage" id="stage">
+    <div class="progress" id="prog"></div>
+    <div class="slides" id="slides">
+
+      <!-- 01 PROBLEM -->
+      <section class="slide active">
+        <div>
+          <div class="idx"><b>01</b><span>/ 05</span><span class="rule"></span></div>
+          <div class="eyebrow">The Problem</div>
+          <h2>Manual disinfo tracing doesn't scale</h2>
+          <p class="lead">Analysts face more narrative content than any team can read — in more languages, engineered to slip past keyword filters.</p>
+          <ul>
+            <li><span class="knob"></span><span><b>Volume.</b> Narratives spread across countless pages far faster than manual review can read them.</span></li>
+            <li><span class="knob crit"></span><span><b>Evasion.</b> Manipulation is stylistic — loaded headlines, emotional framing, one-sided bias — invisible to keyword and URL blocklists.</span></li>
+            <li><span class="knob"></span><span><b>Multilingual.</b> Threats cross languages; monolingual, region-bound tooling misses them.</span></li>
+            <li><span class="knob"></span><span><b>Surface-level checks.</b> No single signal — source, keyword — captures clickbait, emotion, bias and conspiracy at once.</span></li>
+          </ul>
+        </div>
+        <div class="viz">
+          <div class="plate">
+            <div class="chaos">
+              <div class="chip shard" style="top:1%;left:2%;transform:rotate(-8deg)"><div class="line" style="width:90%"></div><div class="line"></div><div class="line"></div></div>
+              <div class="chip shard" style="top:6%;left:44%;transform:rotate(6deg)"><div class="line" style="width:80%"></div><div class="line"></div><div class="line"></div></div>
+              <div class="chip shard" style="top:30%;left:22%;transform:rotate(-3deg)"><div class="line" style="width:95%"></div><div class="line"></div><div class="line"></div></div>
+              <div class="chip shard" style="top:34%;left:58%;transform:rotate(11deg)"><div class="line" style="width:70%"></div><div class="line"></div><div class="line"></div></div>
+              <div class="chip shard" style="top:56%;left:6%;transform:rotate(7deg)"><div class="line" style="width:85%"></div><div class="line"></div><div class="line"></div></div>
+              <div class="chip shard" style="top:60%;left:46%;transform:rotate(-9deg)"><div class="line" style="width:78%"></div><div class="line"></div><div class="line"></div></div>
+            </div>
+            <div class="tagline">unstructured · unranked · multilingual · endless</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 02 SOLUTION -->
+      <section class="slide">
+        <div>
+          <div class="idx"><b>02</b><span>/ 05</span><span class="rule"></span></div>
+          <div class="eyebrow">The Core Idea</div>
+          <h2>A crew of specialists, one signal each</h2>
+          <p class="lead">Disinfo Analyzer decomposes each page into <b>four independent, measurable signals</b> using a sequential multi-agent crew with a reasoning layer on top.</p>
+          <ul>
+            <li><span class="knob"></span><span><b>Parse.</b> Newspaper3k extracts headline and body from raw page HTML — analysis runs on content, not page chrome.</span></li>
+            <li><span class="knob"></span><span><b>Decompose.</b> Four CrewAI agents run in sequence, each owning exactly one disinformation signal.</span></li>
+            <li><span class="knob crit"></span><span><b>Ground.</b> Three agents delegate to fine-tuned transformer classifiers; one applies a structured seven-trait conspiracy framework.</span></li>
+            <li><span class="knob"></span><span><b>Structure.</b> Output is a compact per-signal verdict — clickbait, emotion, bias, conspiracy — not a paragraph of opinion.</span></li>
+          </ul>
+        </div>
+        <div class="viz">
+          <div class="plate" style="display:flex;align-items:center">
+            <div class="funnel">
+              <div class="tray"><span class="dotc">🎣</span><div><div class="tl">Clickbait</div><div class="ts">headline ↔ body</div></div></div>
+              <div class="tray"><span class="dotc">🎭</span><div><div class="tl">Emotion</div><div class="ts">manipulation signal</div></div></div>
+              <div class="tray"><span class="dotc">⚖️</span><div><div class="tl">Bias</div><div class="ts">left / center / right</div></div></div>
+              <div class="tray"><span class="dotc">🕵️</span><div><div class="tl">Conspiracy</div><div class="ts">7-trait framework</div></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 03 PRODUCT -->
+      <section class="slide">
+        <div>
+          <div class="idx"><b>03</b><span>/ 05</span><span class="rule"></span></div>
+          <div class="eyebrow">The Desktop Workspace</div>
+          <h2>The analyst workflow</h2>
+          <p class="lead">An analyst runs a full-page analysis from the browser workspace and watches each signal resolve <b>in real time</b>.</p>
+          <ul>
+            <li><span class="knob"></span><span><b>One action.</b> The extension captures the active tab's full HTML via <span style="font-family:var(--ff-m)">chrome.scripting</span>.</span></li>
+            <li><span class="knob crit"></span><span><b>Off-thread stream.</b> An MV3 offscreen document holds the long-running connection and streams Server-Sent Events; the log updates live.</span></li>
+            <li><span class="knob"></span><span><b>Per-tab state.</b> Each tab's analysis persists in <span style="font-family:var(--ff-m)">storage.local</span>, surviving panel close and reopen.</span></li>
+            <li><span class="knob"></span><span><b>Readout.</b> A Final Result card lists every agent's verdict, side by side.</span></li>
+          </ul>
+        </div>
+        <div class="viz">
+          <div class="win">
+            <div class="winbar"><i style="background:var(--terra-lo)"></i><i style="background:var(--sand)"></i><i style="background:var(--sage)"></i><span class="t">Disinfo Analyzer</span></div>
+            <div class="winbody">
+              <div class="btn-clay">Analyze Page</div>
+              <div class="log">
+                <div class="row">Injecting script…</div>
+                <div class="row">Agents analyzing content…</div>
+                <div class="row done">Analysis complete</div>
+              </div>
+              <div class="verdicts">
+                <div class="vd"><span>Headline</span><b>Clickbait</b></div>
+                <div class="vd"><span>Emotion</span><b>Anger</b></div>
+                <div class="vd"><span>Bias</span><b>Right</b></div>
+                <div class="vd"><span>Conspiracy</span><b>Vaccine</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04 TECH -->
+      <section class="slide">
+        <div>
+          <div class="idx"><b>04</b><span>/ 05</span><span class="rule"></span></div>
+          <div class="eyebrow">The Tech Stack</div>
+          <h2>The inference pipeline</h2>
+          <p class="lead">A FastAPI service turns page HTML into four model verdicts, orchestrated by CrewAI and streamed back over SSE.</p>
+          <ul>
+            <li><span class="knob"></span><span><b>Ingest.</b> <span style="font-family:var(--ff-m)">POST /analyze-html/</span> → Newspaper3k parse → a fresh, isolated crew per request.</span></li>
+            <li><span class="knob"></span><span><b>Reasoning layer.</b> Gemini 2.5 Flash (via CrewAI, temp 0.1) directs each agent and writes the conspiracy analysis.</span></li>
+            <li><span class="knob crit"></span><span><b>Grounded classifiers.</b> Transformers on PyTorch — a <b>multilingual XLM-RoBERTa</b> clickbait model works across languages; ModernBERT for GoEmotions and MBIC political bias.</span></li>
+            <li><span class="knob"></span><span><b>Delivery.</b> Streamed as SSE; shipped as a multi-stage Docker image via GitHub Actions to Google Cloud Run.</span></li>
+          </ul>
+        </div>
+        <div class="viz">
+          <div class="plate">
+            <div class="arch">
+              <div class="node io"><div class="nt">Page HTML</div><div class="ns">extension → FastAPI</div></div>
+              <div class="flow">▾</div>
+              <div class="node brain"><div class="nt">Gemini 2.5 Flash · CrewAI</div><div class="ns">sequential orchestration</div></div>
+              <div class="flow">▾</div>
+              <div class="models">
+                <div class="node mdl multi"><div class="nt">XLM-RoBERTa</div><div class="ns">clickbait · multiling.</div></div>
+                <div class="node mdl"><div class="nt">ModernBERT</div><div class="ns">GoEmotions</div></div>
+                <div class="node mdl"><div class="nt">ModernBERT</div><div class="ns">bias · MBIC</div></div>
+                <div class="node mdl"><div class="nt">7-trait</div><div class="ns">conspiracy · LLM</div></div>
+              </div>
+              <div class="flow">▾</div>
+              <div class="node io"><div class="nt">SSE verdict stream</div><div class="ns">Docker · Cloud Run</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 05 PLATFORM -->
+      <section class="slide">
+        <div>
+          <div class="idx"><b>05</b><span>/ 05</span><span class="rule"></span></div>
+          <div class="eyebrow">Platform &amp; Audience</div>
+          <h2>Built for the desktop, on purpose</h2>
+          <p class="lead">Deep disinformation analysis needs screen real estate, secure sessions and sustained attention — <b>not a phone</b>.</p>
+          <ul>
+            <li><span class="knob crit"></span><span><b>Deliberate desktop.</b> A Chrome MV3 extension with a streaming panel, built for the researcher's workstation. Mobile is out of scope.</span></li>
+            <li><span class="knob"></span><span><b>Why.</b> Side-by-side reading, long-running streamed analyses and controlled environments suit serious investigative work.</span></li>
+            <li><span class="knob"></span><span><b>Deployment.</b> Containerized FastAPI on Cloud Run, region-pinned — or self-hosted from the same Docker image for data control.</span></li>
+            <li><span class="knob"></span><span><b>Who.</b> Threat-intel &amp; defense teams, research institutes, policy groups, investigative journalists.</span></li>
+          </ul>
+        </div>
+        <div class="viz">
+          <div class="plate">
+            <div class="setup">
+              <div class="monitor">
+                <div class="screen">
+                  <div class="bar a"></div><div class="bar b"></div><div class="bar c"></div>
+                </div>
+              </div>
+              <div class="stand"></div>
+              <div class="base-bar"></div>
+            </div>
+            <div class="nomob"></div>
+            <div class="nomob-l">no mobile</div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+    <div class="brand"><span class="m"></span> DISINFO ANALYZER · TECHNICAL PITCH</div>
+  </div>
+</div>
+
+<div class="hint">← → · Space · F</div>
+<div class="nav">
+  <button id="prev" aria-label="Previous">‹</button>
+  <div class="dots" id="dots"></div>
+  <span class="counter" id="counter">01 / 05</span>
+  <button id="next" aria-label="Next">›</button>
+  <button id="full" aria-label="Fullscreen" title="Fullscreen">⛶</button>
+</div>
+
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  const dotsWrap=document.getElementById('dots'), counter=document.getElementById('counter'), prog=document.getElementById('prog');
+  let i=0; const n=slides.length;
+  slides.forEach((_,idx)=>{ const d=document.createElement('i'); d.addEventListener('click',()=>go(idx)); dotsWrap.appendChild(d); });
+  const dots=[...dotsWrap.children];
+  function go(k){
+    i=Math.max(0,Math.min(n-1,k));
+    slides.forEach((s,idx)=>s.classList.toggle('active',idx===i));
+    dots.forEach((d,idx)=>d.classList.toggle('on',idx===i));
+    counter.textContent=String(i+1).padStart(2,'0')+' / '+String(n).padStart(2,'0');
+    prog.style.width=(i/(n-1)*100)+'%';
+  }
+  const next=()=>go(i+1), prev=()=>go(i-1);
+  document.getElementById('next').onclick=next;
+  document.getElementById('prev').onclick=prev;
+  document.getElementById('full').onclick=()=>{ document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen(); };
+  addEventListener('keydown',e=>{
+    if(['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){e.preventDefault();next();}
+    else if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){e.preventDefault();prev();}
+    else if(e.key==='Home')go(0); else if(e.key==='End')go(n-1);
+    else if(e.key.toLowerCase()==='f')document.getElementById('full').click();
+  });
+  let sx=0; addEventListener('touchstart',e=>sx=e.touches[0].clientX,{passive:true});
+  addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx; if(Math.abs(dx)>50)dx<0?next():prev();});
+  const start=parseInt((location.hash||'').slice(1),10);
+  go(Number.isFinite(start)?start-1:0);
+</script>
+</body>
+</html>
