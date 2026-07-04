@@ -4,7 +4,7 @@ A gallery of self-contained HTML pitch decks for **Disinfo Analyzer**, a multi-a
 
 One product, presented eight ways — **four visual styles** and **four audiences**.
 
-👉 **Live gallery:** _(GitHub Pages URL appears here once published)_
+👉 **Live gallery:** https://dimivelev.github.io/disinfo-pitch-gallery/
 
 ## The decks
 
