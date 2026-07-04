@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disinfo Analyzer — Alarm</title>
+<style>
+  :root{
+    --bg0:#0a0000; --bg1:#100404; --bg2:#1a0505;
+    --ink:#ffffff; --muted:#f0cccc; --dim:#c08a8a;
+    --c1:#ff2b2b; --c2:#e01919; --c3:#ff4d4d; --c4:#ffb200; --c5:#ff8c1a;
+    --red:#ff2b2b; --red-deep:#e01919; --amber:#ffb200;
+    --card: rgba(255,43,43,.06);
+    --card-brd: rgba(255,43,43,.28);
+    --glow: 0 20px 70px -20px rgba(255,43,43,.55);
+    --redglow: 0 0 34px rgba(255,43,43,.55);
+    --ff: "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+    --stripe: repeating-linear-gradient(45deg, #ffb200 0 14px, #0a0000 14px 28px);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:var(--ff); color:var(--ink);
+    background:
+      radial-gradient(1200px 800px at 15% -10%, rgba(255,43,43,.30), transparent 55%),
+      radial-gradient(1000px 700px at 95% 10%, rgba(224,25,25,.28), transparent 55%),
+      radial-gradient(1100px 900px at 50% 120%, rgba(255,178,0,.14), transparent 55%),
+      linear-gradient(160deg, var(--bg0), var(--bg1) 55%, var(--bg2));
+    background-attachment:fixed;
+    overflow:hidden; display:grid; place-items:center; height:100vh;
+  }
+
+  /* ---- 16:9 stage that scales to viewport ---- */
+  .viewport{ width:100vw; height:100vh; display:grid; place-items:center; }
+  .stage{
+    position:relative;
+    width:min(100vw, 177.78vh);      /* 16:9 by width */
+    height:min(56.25vw, 100vh);      /* 16:9 by height */
+    aspect-ratio:16/9;
+    overflow:hidden;
+    border-radius:clamp(0px, 1.2vh, 22px);
+    box-shadow: var(--glow), 0 0 0 1px rgba(255,43,43,.22);
+  }
+
+  .slides{ position:absolute; inset:0; }
+  .slide{
+    position:absolute; inset:0;
+    padding: 6.2% 7%;
+    display:none;
+    flex-direction:column;
+    animation:fade .55s cubic-bezier(.2,.7,.2,1);
+    /* everything sized in cqw so it scales with the stage */
+    container-type:inline-size;
+  }
+  /* red warning edge + amber warning stripe down the left of every slide */
+  .slide::before{
+    content:""; position:absolute; top:0; bottom:0; left:0; width:1.1cqw;
+    background:var(--stripe); opacity:.9; z-index:5;
+  }
+  .slide::after{
+    content:""; position:absolute; top:0; left:0; right:0; height:.5cqw;
+    background:linear-gradient(90deg,var(--red),var(--red-deep) 55%,var(--amber)); z-index:5;
+  }
+  .slide.active{ display:flex; }
+  @keyframes fade{ from{opacity:0; transform:translateY(1.4cqw) scale(.995)} to{opacity:1; transform:none} }
+
+  /* type scale in container query width units */
+  .eyebrow{ font-size:1.35cqw; letter-spacing:.5em; text-transform:uppercase; color:var(--amber); font-weight:800; }
+  h1{ font-size:8.8cqw; line-height:.92; font-weight:900; letter-spacing:-.03em; text-transform:uppercase; }
+  h2{ font-size:5.4cqw; line-height:.98; font-weight:900; letter-spacing:-.025em; }
+  h3{ font-size:2.3cqw; font-weight:800; letter-spacing:-.01em; }
+  p,li{ font-size:1.8cqw; line-height:1.48; color:var(--muted); }
+  .lead{ font-size:2.3cqw; color:var(--ink); font-weight:600; }
+  .grad{ color:var(--red); text-shadow:var(--redglow); }
+  .grad2{ color:var(--amber); text-shadow:0 0 30px rgba(255,178,0,.5); }
+
+  .fill{flex:1}
+  .row{display:flex; gap:2.4cqw}
+  .between{justify-content:space-between; align-items:center}
+  .center{align-items:center; justify-content:center}
+  .wrap{flex-wrap:wrap}
+
+  .chip{
+    display:inline-flex; align-items:center; gap:.6cqw;
+    padding:.7cqw 1.3cqw; border-radius:999px;
+    background:var(--card); border:1px solid var(--card-brd);
+    font-size:1.35cqw; color:var(--muted); font-weight:700;
+    text-transform:uppercase; letter-spacing:.06em;
+  }
+  .dot{width:.9cqw;height:.9cqw;border-radius:50%}
+
+  .card{
+    background:linear-gradient(180deg, rgba(255,43,43,.09), rgba(10,0,0,.35));
+    border:1px solid var(--card-brd);
+    border-left:.6cqw solid var(--red);
+    border-radius:1.2cqw; padding:2.4cqw;
+    backdrop-filter: blur(6px);
+    position:relative; overflow:hidden;
+  }
+  .card::before{ content:""; position:absolute; inset:0 0 auto 0; height:.35cqw; background:linear-gradient(90deg,var(--a1,var(--red)),var(--a2,var(--amber))); opacity:.95 }
+
+  .grid{ display:grid; gap:2cqw; }
+  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+
+  .icon{ font-size:3cqw; line-height:1; display:block; margin-bottom:1cqw; }
+  .kpi{ font-size:5.6cqw; font-weight:900; line-height:1; letter-spacing:-.03em; color:var(--red); text-shadow:var(--redglow); }
+  .kpi-l{ font-size:1.5cqw; color:var(--dim); margin-top:.6cqw; text-transform:uppercase; letter-spacing:.12em; font-weight:800 }
+
+  ul{list-style:none; display:flex; flex-direction:column; gap:1.1cqw}
+  ul li{ position:relative; padding-left:2.6cqw; }
+  ul li::before{ content:"▸"; position:absolute; left:0; color:var(--red); font-weight:900 }
+
+  /* pipeline */
+  .pipe{ display:flex; align-items:stretch; gap:0; margin-top:1cqw }
+  .step{ flex:1; text-align:center; position:relative; padding:1.6cqw 1cqw }
+  .step .num{ width:3.4cqw;height:3.4cqw;border-radius:50%; margin:0 auto 1cqw; display:grid;place-items:center; font-weight:900; font-size:1.7cqw; background:linear-gradient(135deg,var(--red),var(--red-deep)); color:#fff; box-shadow:0 8px 24px -6px rgba(255,43,43,.75) }
+  .step .st{ font-weight:800; font-size:1.65cqw; color:var(--ink); margin-bottom:.5cqw; text-transform:uppercase; letter-spacing:.04em }
+  .step .sd{ font-size:1.3cqw; color:var(--dim) }
+  .step:not(:last-child)::after{ content:"›"; position:absolute; right:-1cqw; top:2.4cqw; font-size:3cqw; color:var(--amber); opacity:.8 }
+
+  /* agent tiles */
+  .agent .icon{ font-size:3.4cqw }
+  .agent .tag{ font-size:1.15cqw; font-family:var(--mono); color:var(--amber); text-transform:uppercase; letter-spacing:.12em; font-weight:700 }
+  .agent p{ font-size:1.45cqw; margin-top:.7cqw }
+  .agent .out{ margin-top:1.2cqw; font-size:1.3cqw; color:var(--dim); font-style:italic; border-left:.3cqw solid var(--red); padding-left:1cqw }
+
+  /* demo mock */
+  .browser{ border-radius:1cqw; overflow:hidden; border:1px solid var(--card-brd); background:rgba(10,0,0,.7); box-shadow:0 30px 80px -30px #000 }
+  .bbar{ display:flex; gap:.8cqw; align-items:center; padding:1cqw 1.4cqw; background:rgba(255,43,43,.08); border-bottom:1px solid var(--card-brd) }
+  .bbar .b{width:1.1cqw;height:1.1cqw;border-radius:50%}
+  .burl{ margin-left:1cqw; font-family:var(--mono); font-size:1.1cqw; color:var(--dim); background:rgba(0,0,0,.4); padding:.5cqw 1.2cqw; border-radius:.7cqw; flex:1 }
+  .bbody{ padding:1.8cqw }
+  .verdict{ display:flex; align-items:center; gap:1.4cqw; padding:1.6cqw; border-radius:.9cqw; background:linear-gradient(90deg, rgba(255,43,43,.28), rgba(255,178,0,.12)); border:1px solid rgba(255,43,43,.55); margin-bottom:1.6cqw; box-shadow:inset 0 0 30px rgba(255,43,43,.2) }
+  .score{ font-size:4cqw; font-weight:900; text-transform:uppercase; letter-spacing:-.02em }
+  .result-row{ display:flex; align-items:center; gap:1.2cqw; padding:1.1cqw 0; border-bottom:1px solid rgba(255,43,43,.15) }
+  .result-row:last-child{border:0}
+  .result-row .ri{ font-size:2cqw; width:3cqw; text-align:center }
+  .result-row .rl{ font-weight:800; font-size:1.5cqw }
+  .result-row .rv{ margin-left:auto; font-size:1.4cqw; font-weight:800; padding:.4cqw 1.1cqw; border-radius:999px }
+  .badge-bad{ background:rgba(255,43,43,.28); color:#ff9b9b } .badge-warn{ background:rgba(255,178,0,.22); color:#ffd98a } .badge-ok{ background:rgba(255,140,26,.2); color:#ffc48a }
+
+  /* stack chips */
+  .stack{display:flex; flex-wrap:wrap; gap:1cqw}
+  .stack .t{ padding:.9cqw 1.6cqw; border-radius:.8cqw; background:var(--card); border:1px solid var(--card-brd); font-weight:700; font-size:1.55cqw }
+
+  .footer-brand{ position:absolute; left:7%; bottom:4.4%; font-size:1.2cqw; color:var(--dim); font-weight:800; letter-spacing:.1em; display:flex; align-items:center; gap:.8cqw; text-transform:uppercase; z-index:6 }
+  .footer-brand .lg{ width:1.6cqw;height:1.6cqw;border-radius:.3cqw; background:linear-gradient(135deg,var(--red),var(--amber)); box-shadow:var(--redglow) }
+
+  .hero-logo{ width:7cqw;height:7cqw;border-radius:1.4cqw; background:linear-gradient(135deg,var(--red),var(--red-deep)); display:grid;place-items:center; font-size:4cqw; box-shadow:var(--glow), var(--redglow); margin-bottom:2.5cqw; border:.25cqw solid rgba(255,178,0,.5) }
+
+  /* ---- chrome / controls ---- */
+  .nav{ position:fixed; bottom:2.2vh; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:14px; z-index:50;
+    background:rgba(16,4,4,.7); border:1px solid rgba(255,43,43,.3); padding:8px 14px; border-radius:999px; backdrop-filter:blur(12px) }
+  .nav button{ background:none;border:0;color:var(--ink);cursor:pointer;font-size:16px; width:30px;height:30px;border-radius:50%; display:grid;place-items:center; transition:.2s }
+  .nav button:hover{ background:rgba(255,43,43,.22) }
+  .dots{ display:flex; gap:7px }
+  .dots i{ width:8px;height:8px;border-radius:50%; background:rgba(255,43,43,.3); cursor:pointer; transition:.25s }
+  .dots i.on{ background:linear-gradient(90deg,var(--red),var(--amber)); width:22px; border-radius:999px; box-shadow:0 0 12px rgba(255,43,43,.7) }
+  .counter{ font-family:var(--mono); font-size:12px; color:var(--dim); min-width:44px; text-align:center }
+  .hint{ position:fixed; top:2vh; right:2vw; font-size:11px; color:var(--dim); z-index:50; font-family:var(--mono); opacity:.7 }
+  .progress{ position:absolute; top:0; left:0; height:.5cqw; background:linear-gradient(90deg,var(--red),var(--amber)); z-index:20; transition:width .4s ease; box-shadow:0 0 12px rgba(255,43,43,.8) }
+
+  /* ---- PDF / print: one slide per landscape page (13.333in x 7.5in = 16:9) ---- */
+  @media print{
+    @page{ size:13.333in 7.5in; margin:0; }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    html,body{ height:auto; overflow:visible; display:block; }
+    body{ background:var(--bg1); }
+    .viewport{ display:block; width:auto; height:auto; }
+    .stage{ width:auto; height:auto; aspect-ratio:auto; box-shadow:none; border-radius:0; overflow:visible; }
+    .slides{ position:static; }
+    .slide{
+      position:relative !important; display:flex !important;
+      width:13.333in; height:7.5in; overflow:hidden;
+      border-radius:0; animation:none;
+      page-break-after:always; break-after:page;
+      background:
+        radial-gradient(1200px 800px at 15% -10%, rgba(255,43,43,.30), transparent 55%),
+        radial-gradient(1000px 700px at 95% 10%, rgba(224,25,25,.28), transparent 55%),
+        radial-gradient(1100px 900px at 50% 120%, rgba(255,178,0,.14), transparent 55%),
+        linear-gradient(160deg, var(--bg0), var(--bg1) 55%, var(--bg2));
+    }
+    .slide:last-of-type{ page-break-after:avoid; break-after:auto; }
+    .nav,.hint,.progress,.footer-brand{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="viewport">
+  <div class="stage" id="stage">
+    <div class="progress" id="prog"></div>
+    <div class="slides" id="slides">
+
+      <!-- 1 — TITLE -->
+      <section class="slide active" style="justify-content:center">
+        <div class="hero-logo">🛡️</div>
+        <div class="eyebrow">Multi-Agent AI · Browser Extension</div>
+        <h1 style="margin:.5cqw 0 2cqw">Disinfo<span class="grad">.</span>Analyzer</h1>
+        <p class="lead" style="max-width:62cqw">A team of AI agents that reads any web page and flags <b style="color:var(--ink)">clickbait, emotional manipulation, political bias, and conspiracy theories</b> — in real time, right in your browser.</p>
+        <div class="row wrap" style="margin-top:3cqw">
+          <span class="chip"><span class="dot" style="background:var(--c1)"></span> CrewAI · 4 Agents</span>
+          <span class="chip"><span class="dot" style="background:var(--c4)"></span> FastAPI Streaming</span>
+          <span class="chip"><span class="dot" style="background:var(--c3)"></span> One-Click Chrome Ext</span>
+        </div>
+      </section>
+
+      <!-- 2 — PROBLEM -->
+      <section class="slide">
+        <div class="eyebrow">The Problem</div>
+        <h2 style="margin:.8cqw 0 2cqw">Reading the news shouldn't require a <span class="grad2">detective</span>.</h2>
+        <div class="row" style="gap:2cqw; flex:1">
+          <div class="grid g3" style="flex:1; align-content:start">
+            <div class="card" style="--a1:var(--c1);--a2:var(--c4)"><div class="kpi grad2">64%</div><div class="kpi-l">of people struggle to tell real from fake news</div></div>
+            <div class="card" style="--a1:var(--c1);--a2:var(--c2)"><div class="kpi">6×</div><div class="kpi-l">faster spread for false stories than true ones</div></div>
+            <div class="card" style="--a1:var(--c2);--a2:var(--c5)"><div class="kpi">1 tab</div><div class="kpi-l">is all it takes to be manipulated unknowingly</div></div>
+          </div>
+        </div>
+        <p class="lead" style="margin-top:1cqw">Manipulation is subtle — a loaded headline, an angry tone, a one-sided frame. Humans miss it. <span class="grad">Machines can catch it.</span></p>
+      </section>
+
+      <!-- 3 — SOLUTION -->
+      <section class="slide" style="justify-content:center">
+        <div class="eyebrow">The Solution</div>
+        <h2 style="margin:1cqw 0 2.4cqw; max-width:70cqw">Click once. A crew of specialist AIs dissects the page and hands you a verdict.</h2>
+        <div class="grid g3">
+          <div class="card center" style="text-align:center;--a1:var(--c1);--a2:var(--c2)"><span class="icon">⚡</span><h3>Instant</h3><p>Results stream back live while you stay on the page.</p></div>
+          <div class="card center" style="text-align:center;--a1:var(--c2);--a2:var(--c3)"><span class="icon">🧠</span><h3>Explainable</h3><p>Every flag comes from a purpose-built ML model, not a black box.</p></div>
+          <div class="card center" style="text-align:center;--a1:var(--c3);--a2:var(--c4)"><span class="icon">🔌</span><h3>Zero friction</h3><p>No copy-paste. It reads the tab you're already on.</p></div>
+        </div>
+      </section>
+
+      <!-- 4 — HOW IT WORKS -->
+      <section class="slide">
+        <div class="eyebrow">How It Works</div>
+        <h2 style="margin:.8cqw 0 1cqw">From a live tab to a verdict in <span class="grad">four steps</span></h2>
+        <div class="fill center">
+          <div class="pipe" style="width:100%">
+            <div class="step"><div class="num">1</div><div class="st">Capture</div><div class="sd">Extension grabs the full HTML of the active tab</div></div>
+            <div class="step"><div class="num">2</div><div class="st">Parse</div><div class="sd">FastAPI extracts headline + body with Newspaper3k</div></div>
+            <div class="step"><div class="num">3</div><div class="st">Analyze</div><div class="sd">CrewAI runs 4 specialist agents in sequence</div></div>
+            <div class="step"><div class="num">4</div><div class="st">Stream</div><div class="sd">Results flow back live via Server-Sent Events</div></div>
+          </div>
+        </div>
+        <div class="row wrap" style="justify-content:center; gap:1.2cqw">
+          <span class="chip">HTML payload</span><span class="chip">→ /analyze-html/</span><span class="chip">→ text/event-stream</span><span class="chip">→ popup UI</span>
+        </div>
+      </section>
+
+      <!-- 5 — THE CREW (star slide) -->
+      <section class="slide">
+        <div class="eyebrow">The AI Crew · Powered by CrewAI</div>
+        <h2 style="margin:.6cqw 0 1.6cqw">Four specialists. <span class="grad">One verdict.</span></h2>
+        <div class="grid g4" style="flex:1">
+          <div class="card agent" style="--a1:var(--c1);--a2:var(--c2)"><span class="icon">🎣</span><div class="tag">Headline Analyzer</div><p>Semantic similarity between headline & body flags clickbait.</p><div class="out">"Likely clickbait — similarity 0.45"</div></div>
+          <div class="card agent" style="--a1:var(--c2);--a2:var(--c5)"><span class="icon">🎭</span><div class="tag">Emotion Analyst</div><p>GoEmotions model quantifies manipulative emotional language.</p><div class="out">"Driven by anger & disgust"</div></div>
+          <div class="card agent" style="--a1:var(--c4);--a2:var(--c3)"><span class="icon">⚖️</span><div class="tag">Bias Detector</div><p>ModernBERT classifies political lean: Left / Center / Right.</p><div class="out">"Right-leaning framing"</div></div>
+          <div class="card agent" style="--a1:var(--c3);--a2:var(--c1)"><span class="icon">🕵️</span><div class="tag">Conspiracy Detector</div><p>7-trait framework spots promoted Vaccine / GMO / 5G myths.</p><div class="out">"Vaccine conspiracy detected"</div></div>
+        </div>
+        <p style="text-align:center; margin-top:.4cqw">Each agent wraps a <b style="color:var(--ink)">real, fine-tuned transformer</b> as a tool — orchestrated by a Gemini-driven reasoning layer.</p>
+      </section>
+
+      <!-- 6 — DEMO -->
+      <section class="slide">
+        <div class="eyebrow">Live Demo</div>
+        <h2 style="margin:.6cqw 0 1.4cqw">What the user sees</h2>
+        <div class="row" style="gap:2.4cqw; flex:1">
+          <div class="browser" style="flex:1.2">
+            <div class="bbar"><span class="b" style="background:#ff5f57"></span><span class="b" style="background:#febc2e"></span><span class="b" style="background:#28c840"></span><span class="burl">news-site.com/breaking-story</span></div>
+            <div class="bbody">
+              <div class="verdict">
+                <div class="score grad2">High Risk</div>
+                <div><h3 style="font-size:1.7cqw">Manipulation likely</h3><p style="font-size:1.3cqw">3 of 4 signals triggered</p></div>
+              </div>
+              <div class="result-row"><span class="ri">🎣</span><span class="rl">Headline</span><span class="rv badge-bad">Clickbait · 0.45</span></div>
+              <div class="result-row"><span class="ri">🎭</span><span class="rl">Emotion</span><span class="rv badge-warn">Anger + Disgust</span></div>
+              <div class="result-row"><span class="ri">⚖️</span><span class="rl">Bias</span><span class="rv badge-warn">Right-leaning</span></div>
+              <div class="result-row"><span class="ri">🕵️</span><span class="rl">Conspiracy</span><span class="rv badge-bad">Vaccine myth</span></div>
+            </div>
+          </div>
+          <div style="flex:.85; align-self:center">
+            <ul>
+              <li>One click on the extension icon — no setup, no paste.</li>
+              <li>Status updates stream in as each agent finishes.</li>
+              <li>Color-coded verdict: read on, or read critically.</li>
+              <li>Works on any article, any site, any language the models support.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7 — WHY MULTI-AGENT -->
+      <section class="slide" style="justify-content:center">
+        <div class="eyebrow">Why It's Different</div>
+        <h2 style="margin:1cqw 0 2.4cqw; max-width:72cqw">Not one prompt guessing — <span class="grad">four experts measuring.</span></h2>
+        <div class="grid g2">
+          <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><h3>❌ The usual approach</h3><p style="margin-top:1cqw">Paste text into a single chatbot and ask "is this fake?" — one opinion, no grounding, easy to hallucinate.</p></div>
+          <div class="card" style="--a1:var(--c2);--a2:var(--c5)"><h3>✅ Our approach</h3><p style="margin-top:1cqw">Isolated agents, each backed by a task-specific model trained on real datasets (Clickbait, GoEmotions, MBIC). Measurable. Auditable. Composable.</p></div>
+        </div>
+      </section>
+
+      <!-- 8 — TECH / ENGINEERING -->
+      <section class="slide">
+        <div class="eyebrow">Under The Hood</div>
+        <h2 style="margin:.6cqw 0 1.8cqw">Production-grade, not a notebook</h2>
+        <div class="row" style="gap:2.4cqw; flex:1">
+          <div class="card" style="flex:1;--a1:var(--c1);--a2:var(--c2)">
+            <h3 style="margin-bottom:1.4cqw">Stack</h3>
+            <div class="stack">
+              <span class="t">Python</span><span class="t">FastAPI</span><span class="t">CrewAI</span><span class="t">PyTorch</span><span class="t">Transformers</span><span class="t">Gemini 2.5</span><span class="t">Chrome MV3</span>
+            </div>
+          </div>
+          <div class="card" style="flex:1;--a1:var(--c2);--a2:var(--c5)">
+            <h3 style="margin-bottom:1.4cqw">Engineering</h3>
+            <ul>
+              <li>Per-request isolated crews — no shared state</li>
+              <li>SSE streaming for real-time UX</li>
+              <li>Dockerized · CI/CD via GitHub Actions</li>
+              <li>Deployed to Google Cloud Run</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9 — ROADMAP -->
+      <section class="slide">
+        <div class="eyebrow">What's Next</div>
+        <h2 style="margin:.6cqw 0 2cqw">From hackathon to habit</h2>
+        <div class="grid g3" style="flex:1; align-content:center">
+          <div class="card" style="--a1:var(--c5);--a2:var(--c2)"><div class="tag" style="font-family:var(--mono);color:var(--c5);font-size:1.2cqw;letter-spacing:.1em">NOW</div><h3 style="margin:.8cqw 0">Working MVP</h3><p>4 agents, streaming API, Chrome extension, cloud-deployed.</p></div>
+          <div class="card" style="--a1:var(--c2);--a2:var(--c1)"><div class="tag" style="font-family:var(--mono);color:var(--c4);font-size:1.2cqw;letter-spacing:.1em">NEXT</div><h3 style="margin:.8cqw 0">Trust score + sources</h3><p>Single 0–100 credibility score, cross-reference with fact-checkers.</p></div>
+          <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><div class="tag" style="font-family:var(--mono);color:var(--c3);font-size:1.2cqw;letter-spacing:.1em">LATER</div><h3 style="margin:.8cqw 0">Firefox + mobile + API</h3><p>Everywhere people read, plus an API for newsrooms & platforms.</p></div>
+        </div>
+      </section>
+
+      <!-- 10 — CLOSE -->
+      <section class="slide" style="justify-content:center; align-items:center; text-align:center">
+        <div class="hero-logo" style="margin:0 auto 2.4cqw">🛡️</div>
+        <h2 style="max-width:74cqw">The internet won't slow down.<br><span class="grad">Give people a second opinion.</span></h2>
+        <p class="lead" style="margin:2.4cqw 0; max-width:60cqw">Disinfo Analyzer turns four AI specialists into a real-time BS-detector for the whole web.</p>
+        <div class="row center wrap">
+          <span class="chip"><span class="dot" style="background:var(--c5)"></span> Try the demo</span>
+          <span class="chip"><span class="dot" style="background:var(--c4)"></span> github.com/disinfo-analyzer</span>
+          <span class="chip"><span class="dot" style="background:var(--c3)"></span> Let's talk</span>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="footer-brand"><span class="lg"></span> DISINFO ANALYZER</div>
+  </div>
+</div>
+
+<div class="hint">← → · Space · F fullscreen</div>
+
+<div class="nav">
+  <button id="prev" aria-label="Previous">‹</button>
+  <div class="dots" id="dots"></div>
+  <span class="counter" id="counter">01 / 10</span>
+  <button id="next" aria-label="Next">›</button>
+  <button id="full" aria-label="Fullscreen" title="Fullscreen">⛶</button>
+</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const dotsWrap = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  const prog = document.getElementById('prog');
+  let i = 0;
+  const n = slides.length;
+
+  slides.forEach((_, idx) => {
+    const d = document.createElement('i');
+    d.addEventListener('click', () => go(idx));
+    dotsWrap.appendChild(d);
+  });
+  const dots = [...dotsWrap.children];
+
+  function go(k){
+    i = Math.max(0, Math.min(n - 1, k));
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+    dots.forEach((d, idx) => d.classList.toggle('on', idx === i));
+    counter.textContent = String(i+1).padStart(2,'0') + ' / ' + String(n).padStart(2,'0');
+    prog.style.width = ((i)/(n-1)*100) + '%';
+  }
+  const next = () => go(i+1);
+  const prev = () => go(i-1);
+
+  document.getElementById('next').onclick = next;
+  document.getElementById('prev').onclick = prev;
+  document.getElementById('full').onclick = () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  };
+
+  addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){ e.preventDefault(); next(); }
+    else if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){ e.preventDefault(); prev(); }
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(n-1);
+    else if (e.key.toLowerCase() === 'f') document.getElementById('full').click();
+  });
+
+  // swipe
+  let sx=0;
+  addEventListener('touchstart', e => sx = e.touches[0].clientX, {passive:true});
+  addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - sx; if(Math.abs(dx)>50) dx<0?next():prev(); });
+
+  go(0);
+</script>
+</body>
+</html>

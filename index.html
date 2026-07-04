@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disinfo Analyzer — Pitch Deck Gallery</title>
+<style>
+  :root{
+    --bg0:#0b0620; --bg1:#160b3a; --bg2:#241155;
+    --ink:#f4f1ff; --muted:#b9b2e6; --dim:#8b83bd;
+    --c1:#7c5cff; --c2:#38bdf8; --c3:#ff5c9d; --c4:#ffd166; --c5:#34d399;
+    --card:rgba(255,255,255,.055); --brd:rgba(255,255,255,.12);
+    --ff:"Segoe UI",system-ui,-apple-system,sans-serif;
+    --mono:"SFMono-Regular","Cascadia Code",Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:var(--ff); color:var(--ink); min-height:100vh;
+    background:
+      radial-gradient(1200px 800px at 12% -10%, rgba(124,92,255,.35), transparent 55%),
+      radial-gradient(1000px 700px at 92% 4%, rgba(56,189,248,.26), transparent 55%),
+      radial-gradient(1100px 900px at 50% 118%, rgba(255,92,157,.26), transparent 55%),
+      linear-gradient(160deg,var(--bg0),var(--bg1) 55%,var(--bg2));
+    background-attachment:fixed;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1240px; margin:0 auto; padding:clamp(28px,6vw,84px) clamp(20px,5vw,48px) 80px}
+  .grad{background:linear-gradient(100deg,var(--c1),var(--c2) 45%,var(--c3)); -webkit-background-clip:text;background-clip:text;color:transparent}
+
+  header .logo{ width:74px;height:74px;border-radius:20px; background:linear-gradient(135deg,var(--c1),var(--c3)); display:grid;place-items:center; font-size:40px; box-shadow:0 20px 60px -18px rgba(124,92,255,.6); margin-bottom:26px }
+  .eyebrow{ font-size:13px; letter-spacing:.4em; text-transform:uppercase; color:var(--c2); font-weight:700 }
+  h1{ font-size:clamp(38px,6vw,68px); line-height:1.02; font-weight:800; letter-spacing:-.02em; margin:10px 0 18px }
+  .sub{ font-size:clamp(16px,2.2vw,21px); color:var(--muted); max-width:640px; line-height:1.55 }
+  .chips{ display:flex; flex-wrap:wrap; gap:10px; margin-top:26px }
+  .chip{ display:inline-flex;align-items:center;gap:8px; padding:9px 15px;border-radius:999px; background:var(--card);border:1px solid var(--brd); font-size:13px;color:var(--muted);font-weight:600 }
+  .dot{width:8px;height:8px;border-radius:50%}
+
+  h2.sec{ font-size:15px; letter-spacing:.28em; text-transform:uppercase; color:var(--dim); font-weight:800; margin:64px 0 22px; display:flex;align-items:center;gap:14px }
+  h2.sec::after{content:"";flex:1;height:1px;background:var(--brd)}
+
+  .grid{ display:grid; gap:26px; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)) }
+
+  .card{ background:var(--card); border:1px solid var(--brd); border-radius:18px; overflow:hidden; backdrop-filter:blur(8px); transition:transform .25s ease, box-shadow .25s ease, border-color .25s; display:flex; flex-direction:column }
+  .card:hover{ transform:translateY(-6px); box-shadow:0 30px 70px -30px rgba(0,0,0,.7); border-color:rgba(255,255,255,.28) }
+  .thumb{ position:relative; aspect-ratio:16/9; overflow:hidden; background:#0b0620; border-bottom:1px solid var(--brd) }
+  .thumb iframe{ width:400%; height:400%; border:0; transform:scale(.25); transform-origin:0 0; pointer-events:none }
+  .thumb .open{ position:absolute; inset:0; display:grid; place-items:center; opacity:0; transition:.25s; background:rgba(11,6,32,.55); font-weight:700; font-size:15px }
+  .thumb .open span{ padding:11px 20px; border-radius:999px; background:linear-gradient(135deg,var(--c1),var(--c3)); box-shadow:0 12px 30px -8px rgba(124,92,255,.7) }
+  .card:hover .thumb .open{ opacity:1 }
+  .badge{ position:absolute; top:12px; left:12px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; padding:6px 11px; border-radius:999px; background:rgba(11,6,32,.72); border:1px solid var(--brd); font-weight:700 }
+  .meta{ padding:18px 20px 20px }
+  .meta h3{ font-size:19px; font-weight:800; letter-spacing:-.01em }
+  .meta p{ font-size:13.5px; color:var(--muted); margin-top:6px; line-height:1.5 }
+  .links{ display:flex; gap:10px; margin-top:15px }
+  .links a{ font-size:13px; font-weight:700; padding:8px 14px; border-radius:10px; border:1px solid var(--brd); background:rgba(255,255,255,.04); transition:.2s }
+  .links a:hover{ background:rgba(255,255,255,.12) }
+  .links a.primary{ background:linear-gradient(135deg,var(--c1),var(--c2)); border-color:transparent }
+
+  .note{ margin-top:60px; padding:22px 24px; border-radius:16px; background:var(--card); border:1px solid var(--brd); font-size:14px; color:var(--muted); line-height:1.6 }
+  .note b{color:var(--ink)}
+  .note code{ font-family:var(--mono); font-size:12.5px; background:rgba(0,0,0,.32); padding:2px 7px; border-radius:6px; color:#d7cffb }
+  footer{ margin-top:48px; font-size:12.5px; color:var(--dim); display:flex; align-items:center; gap:10px }
+  footer .lg{width:16px;height:16px;border-radius:5px;background:linear-gradient(135deg,var(--c1),var(--c3))}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🛡️</div>
+    <div class="eyebrow">Pitch Deck Gallery</div>
+    <h1>Disinfo Analyzer<span class="grad">.</span><br>Eight ways to tell the story</h1>
+    <p class="sub">One product — a multi-agent AI that flags clickbait, emotional manipulation, political bias, and conspiracy theories on any web page — presented in four visual styles and tuned for four audiences. Every deck is a self-contained 16:9 HTML file with keyboard navigation and print-to-PDF built in.</p>
+    <div class="chips">
+      <span class="chip"><span class="dot" style="background:var(--c1)"></span> CrewAI · 4 Agents</span>
+      <span class="chip"><span class="dot" style="background:var(--c2)"></span> FastAPI Streaming</span>
+      <span class="chip"><span class="dot" style="background:var(--c3)"></span> Chrome Extension</span>
+      <span class="chip"><span class="dot" style="background:var(--c5)"></span> 8 Decks</span>
+    </div>
+  </header>
+
+  <h2 class="sec">By Visual Style · Hackathon content</h2>
+  <div class="grid" id="styles"></div>
+
+  <h2 class="sec">By Audience · Modern-gradient look</h2>
+  <div class="grid" id="audiences"></div>
+
+  <div class="note">
+    <b>Using a deck.</b> Click any card to open it. Navigate with <code>← →</code>, <code>Space</code>, or the on-screen dots; press <code>F</code> for fullscreen.
+    <b>Export to PDF:</b> open a deck, press <code>Ctrl/Cmd+P</code>, choose <b>Save as PDF</b>, set <b>Landscape</b>, margins <b>None</b>, and enable <b>Background graphics</b> — each slide prints as one 16:9 page.
+    <br><br>
+    <b>Note:</b> illustrative figures (market size, statistics, funding asks) in the investor and grant decks are placeholders — replace them with real data before presenting.
+  </div>
+
+  <footer><span class="lg"></span> DISINFO ANALYZER · Pitch Deck Gallery</footer>
+</div>
+
+<script>
+  const styles = [
+    {f:"decks/gradient-hackathon.html", t:"Modern Gradient", b:"Gradient", d:"Vibrant gradients, rounded glass cards, friendly SaaS energy. The flagship look."},
+    {f:"decks/cyber-hackathon.html",    t:"Bold Dark Cyber", b:"Cyber", d:"Near-black canvas, neon accents, monospace detailing. Reads like a threat-intel product."},
+    {f:"decks/editorial-hackathon.html",t:"Clean Editorial",  b:"Editorial", d:"Light, airy, serif headlines and hairline rules. Trustworthy and journalistic."},
+    {f:"decks/alarm-hackathon.html",    t:"High-Contrast Alarm", b:"Alarm", d:"Black and alert-red, urgent and dramatic. Truth under attack."},
+  ];
+  const audiences = [
+    {f:"decks/gradient-hackathon.html", t:"Hackathon / Demo", b:"Judges", d:"Tech innovation, the agent architecture, and a live demo up front."},
+    {f:"decks/gradient-investors.html", t:"Investor Pitch",   b:"VC", d:"Market, moat, business model, traction and the ask. Product as proof."},
+    {f:"decks/gradient-grant.html",     t:"Grant & Impact",   b:"Policy", d:"Societal harm, methodological rigor, transparency, ethics and impact."},
+    {f:"decks/gradient-general.html",   t:"Overview",         b:"General", d:"Balanced, all-purpose narrative for conferences, partners and press."},
+  ];
+  const card = c => `
+    <div class="card">
+      <a class="thumb" href="${c.f}" target="_blank" rel="noopener">
+        <span class="badge">${c.b}</span>
+        <iframe src="${c.f}" loading="lazy" tabindex="-1" scrolling="no"></iframe>
+        <span class="open"><span>Open deck ↗</span></span>
+      </a>
+      <div class="meta">
+        <h3>${c.t}</h3>
+        <p>${c.d}</p>
+        <div class="links">
+          <a class="primary" href="${c.f}" target="_blank" rel="noopener">Open ↗</a>
+          <a href="${c.f}" target="_blank" rel="noopener">Preview</a>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById("styles").innerHTML = styles.map(card).join("");
+  document.getElementById("audiences").innerHTML = audiences.map(card).join("");
+</script>
+</body>
+</html>
