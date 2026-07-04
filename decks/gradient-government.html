@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disinfo Analyzer — Public Sector</title>
+<style>
+  :root{
+    --bg0:#0b0620; --bg1:#160b3a; --bg2:#241155;
+    --ink:#f4f1ff; --muted:#b9b2e6; --dim:#8b83bd;
+    --c1:#7c5cff; --c2:#38bdf8; --c3:#ff5c9d; --c4:#ffd166; --c5:#34d399;
+    --card: rgba(255,255,255,.055);
+    --card-brd: rgba(255,255,255,.12);
+    --glow: 0 20px 70px -20px rgba(124,92,255,.55);
+    --ff: "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:var(--ff); color:var(--ink);
+    background:
+      radial-gradient(1200px 800px at 15% -10%, rgba(124,92,255,.35), transparent 55%),
+      radial-gradient(1000px 700px at 95% 10%, rgba(56,189,248,.28), transparent 55%),
+      radial-gradient(1100px 900px at 50% 120%, rgba(255,92,157,.28), transparent 55%),
+      linear-gradient(160deg, var(--bg0), var(--bg1) 55%, var(--bg2));
+    background-attachment:fixed;
+    overflow:hidden; display:grid; place-items:center; height:100vh;
+  }
+
+  /* ---- 16:9 stage that scales to viewport ---- */
+  .viewport{ width:100vw; height:100vh; display:grid; place-items:center; }
+  .stage{
+    position:relative;
+    width:min(100vw, 177.78vh);      /* 16:9 by width */
+    height:min(56.25vw, 100vh);      /* 16:9 by height */
+    aspect-ratio:16/9;
+    overflow:hidden;
+    border-radius:clamp(0px, 1.2vh, 22px);
+    box-shadow: var(--glow), 0 0 0 1px rgba(255,255,255,.05);
+  }
+
+  .slides{ position:absolute; inset:0; }
+  .slide{
+    position:absolute; inset:0;
+    padding: 6.2% 7%;
+    display:none;
+    flex-direction:column;
+    animation:fade .55s cubic-bezier(.2,.7,.2,1);
+    /* everything sized in cqw so it scales with the stage */
+    container-type:inline-size;
+  }
+  .slide.active{ display:flex; }
+  @keyframes fade{ from{opacity:0; transform:translateY(1.4cqw) scale(.995)} to{opacity:1; transform:none} }
+
+  /* type scale in container query width units */
+  .eyebrow{ font-size:1.35cqw; letter-spacing:.42em; text-transform:uppercase; color:var(--c2); font-weight:700; }
+  h1{ font-size:8.4cqw; line-height:.98; font-weight:800; letter-spacing:-.02em; }
+  h2{ font-size:5.2cqw; line-height:1.03; font-weight:800; letter-spacing:-.02em; }
+  h3{ font-size:2.3cqw; font-weight:700; letter-spacing:-.01em; }
+  p,li{ font-size:1.8cqw; line-height:1.5; color:var(--muted); }
+  .lead{ font-size:2.3cqw; color:var(--ink); font-weight:500; }
+  .grad{ background:linear-gradient(100deg,var(--c1),var(--c2) 45%,var(--c3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .grad2{ background:linear-gradient(100deg,var(--c4),var(--c3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+
+  .fill{flex:1}
+  .row{display:flex; gap:2.4cqw}
+  .between{justify-content:space-between; align-items:center}
+  .center{align-items:center; justify-content:center}
+  .wrap{flex-wrap:wrap}
+
+  .chip{
+    display:inline-flex; align-items:center; gap:.6cqw;
+    padding:.7cqw 1.3cqw; border-radius:999px;
+    background:var(--card); border:1px solid var(--card-brd);
+    font-size:1.35cqw; color:var(--muted); font-weight:600;
+  }
+  .dot{width:.9cqw;height:.9cqw;border-radius:50%}
+
+  .card{
+    background:var(--card); border:1px solid var(--card-brd);
+    border-radius:1.6cqw; padding:2.4cqw;
+    backdrop-filter: blur(8px);
+    position:relative; overflow:hidden;
+  }
+  .card::before{ content:""; position:absolute; inset:0 0 auto 0; height:.35cqw; background:linear-gradient(90deg,var(--a1,var(--c1)),var(--a2,var(--c2))); opacity:.9 }
+
+  .grid{ display:grid; gap:2cqw; }
+  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+
+  .icon{ font-size:3cqw; line-height:1; display:block; margin-bottom:1cqw; }
+  .kpi{ font-size:5.4cqw; font-weight:800; line-height:1; letter-spacing:-.02em; }
+  .kpi-l{ font-size:1.5cqw; color:var(--dim); margin-top:.6cqw; text-transform:uppercase; letter-spacing:.12em; font-weight:700 }
+
+  ul{list-style:none; display:flex; flex-direction:column; gap:1.1cqw}
+  ul li{ position:relative; padding-left:2.6cqw; }
+  ul li::before{ content:"→"; position:absolute; left:0; color:var(--c2); font-weight:800 }
+
+  /* pipeline */
+  .pipe{ display:flex; align-items:stretch; gap:0; margin-top:1cqw }
+  .step{ flex:1; text-align:center; position:relative; padding:1.6cqw 1cqw }
+  .step .num{ width:3.4cqw;height:3.4cqw;border-radius:50%; margin:0 auto 1cqw; display:grid;place-items:center; font-weight:800; font-size:1.7cqw; background:linear-gradient(135deg,var(--c1),var(--c2)); color:#fff; box-shadow:0 8px 24px -6px rgba(124,92,255,.6) }
+  .step .st{ font-weight:700; font-size:1.65cqw; color:var(--ink); margin-bottom:.5cqw }
+  .step .sd{ font-size:1.3cqw; color:var(--dim) }
+  .step:not(:last-child)::after{ content:"›"; position:absolute; right:-1cqw; top:2.4cqw; font-size:3cqw; color:var(--c2); opacity:.6 }
+
+  /* agent tiles */
+  .agent .icon{ font-size:3.4cqw }
+  .agent .tag{ font-size:1.15cqw; font-family:var(--mono); color:var(--c2); text-transform:uppercase; letter-spacing:.1em }
+  .agent p{ font-size:1.45cqw; margin-top:.7cqw }
+  .agent .out{ margin-top:1.2cqw; font-size:1.3cqw; color:var(--dim); font-style:italic; border-left:.3cqw solid var(--card-brd); padding-left:1cqw }
+
+  /* demo mock */
+  .browser{ border-radius:1.4cqw; overflow:hidden; border:1px solid var(--card-brd); background:rgba(10,6,30,.6); box-shadow:0 30px 80px -30px #000 }
+  .bbar{ display:flex; gap:.8cqw; align-items:center; padding:1cqw 1.4cqw; background:rgba(255,255,255,.06); border-bottom:1px solid var(--card-brd) }
+  .bbar .b{width:1.1cqw;height:1.1cqw;border-radius:50%}
+  .burl{ margin-left:1cqw; font-family:var(--mono); font-size:1.1cqw; color:var(--dim); background:rgba(0,0,0,.3); padding:.5cqw 1.2cqw; border-radius:.7cqw; flex:1 }
+  .bbody{ padding:1.8cqw }
+  .verdict{ display:flex; align-items:center; gap:1.4cqw; padding:1.6cqw; border-radius:1.1cqw; background:linear-gradient(90deg, rgba(255,92,157,.18), rgba(255,209,102,.1)); border:1px solid rgba(255,92,157,.35); margin-bottom:1.6cqw }
+  .score{ font-size:4cqw; font-weight:800; }
+  .result-row{ display:flex; align-items:center; gap:1.2cqw; padding:1.1cqw 0; border-bottom:1px solid rgba(255,255,255,.07) }
+  .result-row:last-child{border:0}
+  .result-row .ri{ font-size:2cqw; width:3cqw; text-align:center }
+  .result-row .rl{ font-weight:700; font-size:1.5cqw }
+  .result-row .rv{ margin-left:auto; font-size:1.4cqw; font-weight:700; padding:.4cqw 1.1cqw; border-radius:999px }
+  .badge-bad{ background:rgba(255,92,157,.2); color:#ff9bc2 } .badge-warn{ background:rgba(255,209,102,.18); color:#ffe0a3 } .badge-ok{ background:rgba(52,211,153,.18); color:#88f0c8 }
+
+  /* stack chips */
+  .stack{display:flex; flex-wrap:wrap; gap:1cqw}
+  .stack .t{ padding:.9cqw 1.6cqw; border-radius:1cqw; background:var(--card); border:1px solid var(--card-brd); font-weight:600; font-size:1.55cqw }
+
+  .footer-brand{ position:absolute; left:7%; bottom:4.4%; font-size:1.2cqw; color:var(--dim); font-weight:700; letter-spacing:.05em; display:flex; align-items:center; gap:.8cqw }
+  .footer-brand .lg{ width:1.6cqw;height:1.6cqw;border-radius:.4cqw; background:linear-gradient(135deg,var(--c1),var(--c3)) }
+
+  .hero-logo{ width:7cqw;height:7cqw;border-radius:1.8cqw; background:linear-gradient(135deg,var(--c1),var(--c3)); display:grid;place-items:center; font-size:4cqw; box-shadow:var(--glow); margin-bottom:2.5cqw }
+
+  /* ---- chrome / controls ---- */
+  .nav{ position:fixed; bottom:2.2vh; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:14px; z-index:50;
+    background:rgba(12,8,32,.6); border:1px solid rgba(255,255,255,.12); padding:8px 14px; border-radius:999px; backdrop-filter:blur(12px) }
+  .nav button{ background:none;border:0;color:var(--ink);cursor:pointer;font-size:16px; width:30px;height:30px;border-radius:50%; display:grid;place-items:center; transition:.2s }
+  .nav button:hover{ background:rgba(255,255,255,.12) }
+  .dots{ display:flex; gap:7px }
+  .dots i{ width:8px;height:8px;border-radius:50%; background:rgba(255,255,255,.25); cursor:pointer; transition:.25s }
+  .dots i.on{ background:linear-gradient(90deg,var(--c1),var(--c2)); width:22px; border-radius:999px }
+  .counter{ font-family:var(--mono); font-size:12px; color:var(--dim); min-width:44px; text-align:center }
+  .hint{ position:fixed; top:2vh; right:2vw; font-size:11px; color:var(--dim); z-index:50; font-family:var(--mono); opacity:.7 }
+  .progress{ position:absolute; top:0; left:0; height:.35cqw; background:linear-gradient(90deg,var(--c1),var(--c2),var(--c3)); z-index:20; transition:width .4s ease }
+
+  /* ---- PDF / print: one slide per landscape page (13.333in x 7.5in = 16:9) ---- */
+  @media print{
+    @page{ size:13.333in 7.5in; margin:0; }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    html,body{ height:auto; overflow:visible; display:block; }
+    body{ background:var(--bg1); }
+    .viewport{ display:block; width:auto; height:auto; }
+    .stage{ width:auto; height:auto; aspect-ratio:auto; box-shadow:none; border-radius:0; overflow:visible; }
+    .slides{ position:static; }
+    .slide{
+      position:relative !important; display:flex !important;
+      width:13.333in; height:7.5in; overflow:hidden;
+      border-radius:0; animation:none;
+      page-break-after:always; break-after:page;
+      background:
+        radial-gradient(1200px 800px at 15% -10%, rgba(124,92,255,.35), transparent 55%),
+        radial-gradient(1000px 700px at 95% 10%, rgba(56,189,248,.28), transparent 55%),
+        radial-gradient(1100px 900px at 50% 120%, rgba(255,92,157,.28), transparent 55%),
+        linear-gradient(160deg, var(--bg0), var(--bg1) 55%, var(--bg2));
+    }
+    .slide:last-of-type{ page-break-after:avoid; break-after:auto; }
+    .nav,.hint,.progress,.footer-brand{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="viewport">
+  <div class="stage" id="stage">
+    <div class="progress" id="prog"></div>
+    <div class="slides" id="slides">
+
+      <!-- 1 — TITLE -->
+      <section class="slide active" style="justify-content:center">
+        <div class="hero-logo">🛡️</div>
+        <div class="eyebrow">Democratic Resilience · Explainable AI</div>
+        <h1 style="margin:.5cqw 0 2cqw">Disinfo<span class="grad">.</span>Analyzer</h1>
+        <p class="lead" style="max-width:64cqw">A transparent, multi-agent AI tool that helps public institutions <b style="color:var(--ink)">see and understand manipulation online</b> — flagging clickbait, emotional manipulation, bias, and conspiracy framing without censoring or removing a single word.</p>
+        <div class="row wrap" style="margin-top:3cqw">
+          <span class="chip"><span class="dot" style="background:var(--c1)"></span> Elections &amp; Public Health</span>
+          <span class="chip"><span class="dot" style="background:var(--c2)"></span> Inform, Don't Censor</span>
+          <span class="chip"><span class="dot" style="background:var(--c3)"></span> Auditable &amp; Rights-Respecting</span>
+        </div>
+      </section>
+
+      <!-- 2 — THE THREAT -->
+      <section class="slide">
+        <div class="eyebrow">The Threat to Public Discourse</div>
+        <h2 style="margin:.8cqw 0 2cqw">Manipulation now targets <span class="grad2">institutions and citizens</span> alike.</h2>
+        <div class="row" style="gap:2cqw; flex:1">
+          <div class="grid g3" style="flex:1; align-content:start">
+            <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><div class="kpi grad2">Elections</div><div class="kpi-l">Coordinated false narratives target voter confidence &amp; turnout</div></div>
+            <div class="card" style="--a1:var(--c1);--a2:var(--c2)"><div class="kpi">Public health</div><div class="kpi-l">Health myths undermine guidance &amp; erode trust in agencies</div></div>
+            <div class="card" style="--a1:var(--c2);--a2:var(--c5)"><div class="kpi">Trust</div><div class="kpi-l">Declining institutional trust weakens the whole information space</div></div>
+          </div>
+        </div>
+        <p class="lead" style="margin-top:1cqw">The harm is rarely a single false claim — it's a loaded headline, an angry frame, a recycled conspiracy. <span class="grad">Subtle, scaled, and hard to see.</span></p>
+        <p style="margin-top:.6cqw; font-size:1.3cqw; color:var(--dim)">Framing is illustrative; specific figures to be sourced from official monitoring during a pilot.</p>
+      </section>
+
+      <!-- 3 — WHY BLUNT RESPONSES FAIL -->
+      <section class="slide" style="justify-content:center">
+        <div class="eyebrow">Why Blunt Responses Fail</div>
+        <h2 style="margin:1cqw 0 2.4cqw; max-width:72cqw">Takedowns and censorship carry <span class="grad2">real costs.</span></h2>
+        <div class="grid g3">
+          <div class="card center" style="text-align:center;--a1:var(--c3);--a2:var(--c4)"><span class="icon">⚖️</span><h3>Rights concerns</h3><p>Removing lawful speech raises freedom-of-expression and due-process questions.</p></div>
+          <div class="card center" style="text-align:center;--a1:var(--c4);--a2:var(--c3)"><span class="icon">📉</span><h3>Erodes trust</h3><p>Blocking content fuels claims of hidden agendas and drives audiences elsewhere.</p></div>
+          <div class="card center" style="text-align:center;--a1:var(--c3);--a2:var(--c1)"><span class="icon">🕳️</span><h3>Misses the point</h3><p>The problem is usually framing, not facts — a binary block can't explain that.</p></div>
+        </div>
+        <p class="lead" style="margin-top:2.4cqw; text-align:center; max-width:70cqw; align-self:center">Institutions need to <span class="grad">understand and explain</span> manipulation — not silence it.</p>
+      </section>
+
+      <!-- 4 — OUR PRINCIPLE -->
+      <section class="slide" style="justify-content:center; align-items:center; text-align:center">
+        <div class="eyebrow">Our Guiding Principle</div>
+        <h2 style="margin:1.2cqw 0 2.2cqw; max-width:76cqw">Inform, don't censor.<br><span class="grad">We flag and explain — never block or remove.</span></h2>
+        <div class="grid g3" style="width:100%">
+          <div class="card" style="--a1:var(--c5);--a2:var(--c2)"><span class="icon">🔎</span><h3>We flag</h3><p>Surface the specific manipulation signals present on a page.</p></div>
+          <div class="card" style="--a1:var(--c2);--a2:var(--c1)"><span class="icon">📖</span><h3>We explain</h3><p>Every flag is traced to a named, purpose-built model — auditable, not opaque.</p></div>
+          <div class="card" style="--a1:var(--c1);--a2:var(--c3)"><span class="icon">🚫</span><h3>We never remove</h3><p>No blocking, no takedowns, no edits. The reader decides, better informed.</p></div>
+        </div>
+      </section>
+
+      <!-- 5 — HOW IT WORKS -->
+      <section class="slide">
+        <div class="eyebrow">How It Works</div>
+        <h2 style="margin:.8cqw 0 1cqw">From a submitted page to an explained result in <span class="grad">four steps</span></h2>
+        <div class="fill center">
+          <div class="pipe" style="width:100%">
+            <div class="step"><div class="num">1</div><div class="st">Capture</div><div class="sd">Staff browser tool submits the HTML of the page under review</div></div>
+            <div class="step"><div class="num">2</div><div class="st">Parse</div><div class="sd">FastAPI service extracts headline + body with Newspaper3k</div></div>
+            <div class="step"><div class="num">3</div><div class="st">Analyze</div><div class="sd">CrewAI runs 4 specialist agents in sequence</div></div>
+            <div class="step"><div class="num">4</div><div class="st">Stream</div><div class="sd">Explained results return live via Server-Sent Events</div></div>
+          </div>
+        </div>
+        <div class="row wrap" style="justify-content:center; gap:1.2cqw">
+          <span class="chip">Submitted HTML</span><span class="chip">→ /analyze-html/</span><span class="chip">→ text/event-stream</span><span class="chip">→ analyst view</span>
+        </div>
+        <p style="text-align:center; margin-top:1cqw; font-size:1.3cqw; color:var(--dim)">Processes only the content explicitly submitted for analysis — no browsing history, no bulk collection.</p>
+      </section>
+
+      <!-- 6 — THE 4-AGENT FRAMEWORK -->
+      <section class="slide">
+        <div class="eyebrow">The Analytical Framework · Powered by CrewAI</div>
+        <h2 style="margin:.6cqw 0 1.6cqw">Four specialists. <span class="grad">Transparent &amp; auditable.</span></h2>
+        <div class="grid g4" style="flex:1">
+          <div class="card agent" style="--a1:var(--c1);--a2:var(--c2)"><span class="icon">🎣</span><div class="tag">Headline Analyzer · XLM-RoBERTa</div><p>Semantic similarity between headline &amp; body flags clickbait.</p><div class="out">"Likely clickbait — similarity 0.45"</div></div>
+          <div class="card agent" style="--a1:var(--c2);--a2:var(--c5)"><span class="icon">🎭</span><div class="tag">Emotion Analyst · GoEmotions</div><p>ModernBERT model quantifies manipulative emotional language.</p><div class="out">"Driven by anger &amp; disgust"</div></div>
+          <div class="card agent" style="--a1:var(--c4);--a2:var(--c3)"><span class="icon">⚖️</span><div class="tag">Bias Detector · MBIC</div><p>ModernBERT classifies political lean: Left / Center / Right.</p><div class="out">"Right-leaning framing"</div></div>
+          <div class="card agent" style="--a1:var(--c3);--a2:var(--c1)"><span class="icon">🕵️</span><div class="tag">Conspiracy Detector · 7-trait</div><p>7-trait framework spots Vaccine / GMO / 5G conspiracy framing.</p><div class="out">"Vaccine conspiracy detected"</div></div>
+        </div>
+        <p style="text-align:center; margin-top:.4cqw">Each agent wraps a <b style="color:var(--ink)">fine-tuned transformer</b> trained on peer-reviewed public datasets — orchestrated by a Gemini 2.5 Flash reasoning layer.</p>
+      </section>
+
+      <!-- 7 — TRANSPARENCY, ACCOUNTABILITY & RIGHTS -->
+      <section class="slide">
+        <div class="eyebrow">Transparency, Accountability &amp; Rights</div>
+        <h2 style="margin:.6cqw 0 1.6cqw">Built for public scrutiny</h2>
+        <div class="row" style="gap:2.4cqw; flex:1">
+          <div class="card" style="flex:1;--a1:var(--c1);--a2:var(--c2)">
+            <h3 style="margin-bottom:1.4cqw">Explainable &amp; accountable</h3>
+            <ul>
+              <li>Every flag maps to a named model &amp; dataset</li>
+              <li>Outputs are signals to interpret, not automated judgments</li>
+              <li>Analysts stay in the loop — human decision, always</li>
+            </ul>
+          </div>
+          <div class="card" style="flex:1;--a1:var(--c2);--a2:var(--c5)">
+            <h3 style="margin-bottom:1.4cqw">Rights &amp; privacy by design</h3>
+            <ul>
+              <li>No content removal, blocking, or editing</li>
+              <li>Processes only the content explicitly submitted</li>
+              <li>No user tracking or bulk data collection</li>
+            </ul>
+          </div>
+        </div>
+        <p style="margin-top:1cqw; font-size:1.3cqw; color:var(--dim)">Rights &amp; privacy characteristics are illustrative of the design intent; to be validated against your legal framework during a pilot.</p>
+      </section>
+
+      <!-- 8 — DEPLOYMENT OPTIONS -->
+      <section class="slide" style="justify-content:center">
+        <div class="eyebrow">Deployment Options</div>
+        <h2 style="margin:1cqw 0 2.4cqw; max-width:74cqw">Flexible deployment for <span class="grad">data control.</span></h2>
+        <div class="grid g3">
+          <div class="card center" style="text-align:center;--a1:var(--c1);--a2:var(--c2)"><span class="icon">🧩</span><h3>Staff browser tool</h3><p>A one-click Chrome (MV3) extension for analysts reviewing a page.</p></div>
+          <div class="card center" style="text-align:center;--a1:var(--c2);--a2:var(--c3)"><span class="icon">🔗</span><h3>Integration API</h3><p>FastAPI streaming endpoint to embed analysis in existing workflows.</p></div>
+          <div class="card center" style="text-align:center;--a1:var(--c3);--a2:var(--c4)"><span class="icon">🏛️</span><h3>Hosting choice</h3><p>Runs on Google Cloud Run, or self-hosted &amp; Dockerized on-premises.</p></div>
+        </div>
+        <p class="lead" style="margin-top:2.4cqw; text-align:center; max-width:70cqw; align-self:center">Same engine, your choice of <span class="grad">where the data lives.</span></p>
+      </section>
+
+      <!-- 9 — PROCUREMENT & COMPLIANCE READINESS -->
+      <section class="slide">
+        <div class="eyebrow">Procurement &amp; Compliance Readiness</div>
+        <h2 style="margin:.6cqw 0 1.8cqw">Ready for public-sector scrutiny</h2>
+        <div class="row" style="gap:2.4cqw; flex:1">
+          <div class="card" style="flex:1;--a1:var(--c1);--a2:var(--c2)">
+            <h3 style="margin-bottom:1.4cqw">Stack (open, standard)</h3>
+            <div class="stack">
+              <span class="t">Python</span><span class="t">FastAPI</span><span class="t">CrewAI</span><span class="t">PyTorch</span><span class="t">Transformers</span><span class="t">Gemini 2.5</span><span class="t">Chrome MV3</span><span class="t">Docker</span>
+            </div>
+            <p style="margin-top:1.6cqw; font-size:1.4cqw">Containerized &amp; portable · CI/CD via GitHub Actions · no lock-in to a single host.</p>
+          </div>
+          <div class="card" style="flex:1;--a1:var(--c2);--a2:var(--c5)">
+            <h3 style="margin-bottom:1.4cqw">Readiness checklist <span style="font-size:1.2cqw; color:var(--dim)">(illustrative)</span></h3>
+            <ul>
+              <li>Security review &amp; access controls</li>
+              <li>Auditability — logged, reproducible outputs</li>
+              <li>Data-residency options (cloud or on-prem)</li>
+              <li>Standards alignment, mapped in a pilot</li>
+            </ul>
+          </div>
+        </div>
+        <p style="margin-top:1cqw; font-size:1.3cqw; color:var(--dim)">Compliance items are placeholders to be evidenced against your framework (e.g. accessibility, security, and AI-governance standards).</p>
+      </section>
+
+      <!-- 10 — PILOT & EVALUATION PLAN -->
+      <section class="slide">
+        <div class="eyebrow">Pilot &amp; Evaluation Plan</div>
+        <h2 style="margin:.6cqw 0 1.4cqw">Prove value with <span class="grad">measurable metrics</span></h2>
+        <div class="row" style="gap:2.4cqw; flex:1">
+          <div class="grid g2" style="flex:1.2; align-content:start">
+            <div class="card" style="--a1:var(--c1);--a2:var(--c2)"><div class="kpi grad">Accuracy</div><div class="kpi-l">Agreement with analyst review on a labelled set (target set in pilot)</div></div>
+            <div class="card" style="--a1:var(--c2);--a2:var(--c5)"><div class="kpi">Time saved</div><div class="kpi-l">Reduction in manual review time per item</div></div>
+            <div class="card" style="--a1:var(--c4);--a2:var(--c3)"><div class="kpi">Coverage</div><div class="kpi-l">Share of flagged pages an analyst confirms as relevant</div></div>
+            <div class="card" style="--a1:var(--c3);--a2:var(--c1)"><div class="kpi">Trust</div><div class="kpi-l">Analyst confidence &amp; explainability rating</div></div>
+          </div>
+          <div style="flex:.85; align-self:center">
+            <ul>
+              <li>Scoped pilot with a defined unit &amp; use case.</li>
+              <li>Baseline vs. tool-assisted review, side by side.</li>
+              <li>Human-in-the-loop throughout — no automated action.</li>
+              <li>Joint go / no-go review against agreed targets.</li>
+            </ul>
+          </div>
+        </div>
+        <p style="margin-top:.6cqw; font-size:1.3cqw; color:var(--dim)">All metric names are illustrative; targets to be agreed with your team before the pilot.</p>
+      </section>
+
+      <!-- 11 — ROADMAP -->
+      <section class="slide">
+        <div class="eyebrow">Roadmap</div>
+        <h2 style="margin:.6cqw 0 2cqw">From working tool to standing capability</h2>
+        <div class="grid g3" style="flex:1; align-content:center">
+          <div class="card" style="--a1:var(--c5);--a2:var(--c2)"><div class="tag" style="font-family:var(--mono);color:var(--c5);font-size:1.2cqw;letter-spacing:.1em">NOW</div><h3 style="margin:.8cqw 0">Working capability</h3><p>4-agent framework, streaming API, browser tool, cloud &amp; Docker deployment.</p></div>
+          <div class="card" style="--a1:var(--c2);--a2:var(--c1)"><div class="tag" style="font-family:var(--mono);color:var(--c2);font-size:1.2cqw;letter-spacing:.1em">NEXT</div><h3 style="margin:.8cqw 0">Reporting &amp; audit trail</h3><p>Case dashboards, exportable evidence, and standards-mapped audit logs.</p></div>
+          <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><div class="tag" style="font-family:var(--mono);color:var(--c3);font-size:1.2cqw;letter-spacing:.1em">LATER</div><h3 style="margin:.8cqw 0">Language &amp; domain expansion</h3><p>More languages, sector-specific models, and secure agency integrations.</p></div>
+        </div>
+      </section>
+
+      <!-- 12 — CLOSE / CTA -->
+      <section class="slide" style="justify-content:center; align-items:center; text-align:center">
+        <div class="hero-logo" style="margin:0 auto 2.4cqw">🛡️</div>
+        <h2 style="max-width:76cqw">Protect the information space —<br><span class="grad">without touching what people can say.</span></h2>
+        <p class="lead" style="margin:2.4cqw 0; max-width:64cqw">Disinfo Analyzer gives public institutions a transparent, rights-respecting way to see and explain manipulation. Let's run a pilot together.</p>
+        <div class="row center wrap">
+          <span class="chip"><span class="dot" style="background:var(--c5)"></span> Scope a pilot</span>
+          <span class="chip"><span class="dot" style="background:var(--c2)"></span> Request a briefing</span>
+          <span class="chip"><span class="dot" style="background:var(--c3)"></span> Partner with us</span>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="footer-brand"><span class="lg"></span> DISINFO ANALYZER</div>
+  </div>
+</div>
+
+<div class="hint">← → · Space · F fullscreen</div>
+
+<div class="nav">
+  <button id="prev" aria-label="Previous">‹</button>
+  <div class="dots" id="dots"></div>
+  <span class="counter" id="counter">01 / 12</span>
+  <button id="next" aria-label="Next">›</button>
+  <button id="full" aria-label="Fullscreen" title="Fullscreen">⛶</button>
+</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const dotsWrap = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  const prog = document.getElementById('prog');
+  let i = 0;
+  const n = slides.length;
+
+  slides.forEach((_, idx) => {
+    const d = document.createElement('i');
+    d.addEventListener('click', () => go(idx));
+    dotsWrap.appendChild(d);
+  });
+  const dots = [...dotsWrap.children];
+
+  function go(k){
+    i = Math.max(0, Math.min(n - 1, k));
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+    dots.forEach((d, idx) => d.classList.toggle('on', idx === i));
+    counter.textContent = String(i+1).padStart(2,'0') + ' / ' + String(n).padStart(2,'0');
+    prog.style.width = ((i)/(n-1)*100) + '%';
+  }
+  const next = () => go(i+1);
+  const prev = () => go(i-1);
+
+  document.getElementById('next').onclick = next;
+  document.getElementById('prev').onclick = prev;
+  document.getElementById('full').onclick = () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  };
+
+  addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){ e.preventDefault(); next(); }
+    else if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){ e.preventDefault(); prev(); }
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(n-1);
+    else if (e.key.toLowerCase() === 'f') document.getElementById('full').click();
+  });
+
+  // swipe
+  let sx=0;
+  addEventListener('touchstart', e => sx = e.touches[0].clientX, {passive:true});
+  addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - sx; if(Math.abs(dx)>50) dx<0?next():prev(); });
+
+  go(0);
+</script>
+</body>
+</html>

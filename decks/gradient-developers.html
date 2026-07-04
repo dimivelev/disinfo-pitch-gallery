@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disinfo Analyzer — Developers</title>
+<style>
+  :root{
+    --bg0:#0b0620; --bg1:#160b3a; --bg2:#241155;
+    --ink:#f4f1ff; --muted:#b9b2e6; --dim:#8b83bd;
+    --c1:#7c5cff; --c2:#38bdf8; --c3:#ff5c9d; --c4:#ffd166; --c5:#34d399;
+    --card: rgba(255,255,255,.055);
+    --card-brd: rgba(255,255,255,.12);
+    --glow: 0 20px 70px -20px rgba(124,92,255,.55);
+    --ff: "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:var(--ff); color:var(--ink);
+    background:
+      radial-gradient(1200px 800px at 15% -10%, rgba(124,92,255,.35), transparent 55%),
+      radial-gradient(1000px 700px at 95% 10%, rgba(56,189,248,.28), transparent 55%),
+      radial-gradient(1100px 900px at 50% 120%, rgba(255,92,157,.28), transparent 55%),
+      linear-gradient(160deg, var(--bg0), var(--bg1) 55%, var(--bg2));
+    background-attachment:fixed;
+    overflow:hidden; display:grid; place-items:center; height:100vh;
+  }
+
+  /* ---- 16:9 stage that scales to viewport ---- */
+  .viewport{ width:100vw; height:100vh; display:grid; place-items:center; }
+  .stage{
+    position:relative;
+    width:min(100vw, 177.78vh);      /* 16:9 by width */
+    height:min(56.25vw, 100vh);      /* 16:9 by height */
+    aspect-ratio:16/9;
+    overflow:hidden;
+    border-radius:clamp(0px, 1.2vh, 22px);
+    box-shadow: var(--glow), 0 0 0 1px rgba(255,255,255,.05);
+  }
+
+  .slides{ position:absolute; inset:0; }
+  .slide{
+    position:absolute; inset:0;
+    padding: 6.2% 7%;
+    display:none;
+    flex-direction:column;
+    animation:fade .55s cubic-bezier(.2,.7,.2,1);
+    /* everything sized in cqw so it scales with the stage */
+    container-type:inline-size;
+  }
+  .slide.active{ display:flex; }
+  @keyframes fade{ from{opacity:0; transform:translateY(1.4cqw) scale(.995)} to{opacity:1; transform:none} }
+
+  /* type scale in container query width units */
+  .eyebrow{ font-size:1.35cqw; letter-spacing:.42em; text-transform:uppercase; color:var(--c2); font-weight:700; }
+  h1{ font-size:8.4cqw; line-height:.98; font-weight:800; letter-spacing:-.02em; }
+  h2{ font-size:5.2cqw; line-height:1.03; font-weight:800; letter-spacing:-.02em; }
+  h3{ font-size:2.3cqw; font-weight:700; letter-spacing:-.01em; }
+  p,li{ font-size:1.8cqw; line-height:1.5; color:var(--muted); }
+  .lead{ font-size:2.3cqw; color:var(--ink); font-weight:500; }
+  .grad{ background:linear-gradient(100deg,var(--c1),var(--c2) 45%,var(--c3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .grad2{ background:linear-gradient(100deg,var(--c4),var(--c3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+
+  .fill{flex:1}
+  .row{display:flex; gap:2.4cqw}
+  .between{justify-content:space-between; align-items:center}
+  .center{align-items:center; justify-content:center}
+  .wrap{flex-wrap:wrap}
+
+  .chip{
+    display:inline-flex; align-items:center; gap:.6cqw;
+    padding:.7cqw 1.3cqw; border-radius:999px;
+    background:var(--card); border:1px solid var(--card-brd);
+    font-size:1.35cqw; color:var(--muted); font-weight:600;
+  }
+  .dot{width:.9cqw;height:.9cqw;border-radius:50%}
+
+  .card{
+    background:var(--card); border:1px solid var(--card-brd);
+    border-radius:1.6cqw; padding:2.4cqw;
+    backdrop-filter: blur(8px);
+    position:relative; overflow:hidden;
+  }
+  .card::before{ content:""; position:absolute; inset:0 0 auto 0; height:.35cqw; background:linear-gradient(90deg,var(--a1,var(--c1)),var(--a2,var(--c2))); opacity:.9 }
+
+  .grid{ display:grid; gap:2cqw; }
+  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+
+  .icon{ font-size:3cqw; line-height:1; display:block; margin-bottom:1cqw; }
+  .kpi{ font-size:5.4cqw; font-weight:800; line-height:1; letter-spacing:-.02em; }
+  .kpi-l{ font-size:1.5cqw; color:var(--dim); margin-top:.6cqw; text-transform:uppercase; letter-spacing:.12em; font-weight:700 }
+
+  ul{list-style:none; display:flex; flex-direction:column; gap:1.1cqw}
+  ul li{ position:relative; padding-left:2.6cqw; }
+  ul li::before{ content:"→"; position:absolute; left:0; color:var(--c2); font-weight:800 }
+
+  /* pipeline */
+  .pipe{ display:flex; align-items:stretch; gap:0; margin-top:1cqw }
+  .step{ flex:1; text-align:center; position:relative; padding:1.6cqw 1cqw }
+  .step .num{ width:3.4cqw;height:3.4cqw;border-radius:50%; margin:0 auto 1cqw; display:grid;place-items:center; font-weight:800; font-size:1.7cqw; background:linear-gradient(135deg,var(--c1),var(--c2)); color:#fff; box-shadow:0 8px 24px -6px rgba(124,92,255,.6) }
+  .step .st{ font-weight:700; font-size:1.65cqw; color:var(--ink); margin-bottom:.5cqw }
+  .step .sd{ font-size:1.3cqw; color:var(--dim) }
+  .step:not(:last-child)::after{ content:"›"; position:absolute; right:-1cqw; top:2.4cqw; font-size:3cqw; color:var(--c2); opacity:.6 }
+
+  /* agent tiles */
+  .agent .icon{ font-size:3.4cqw }
+  .agent .tag{ font-size:1.15cqw; font-family:var(--mono); color:var(--c2); text-transform:uppercase; letter-spacing:.1em }
+  .agent p{ font-size:1.45cqw; margin-top:.7cqw }
+  .agent .out{ margin-top:1.2cqw; font-size:1.3cqw; color:var(--dim); font-style:italic; border-left:.3cqw solid var(--card-brd); padding-left:1cqw }
+
+  /* demo mock */
+  .browser{ border-radius:1.4cqw; overflow:hidden; border:1px solid var(--card-brd); background:rgba(10,6,30,.6); box-shadow:0 30px 80px -30px #000 }
+  .bbar{ display:flex; gap:.8cqw; align-items:center; padding:1cqw 1.4cqw; background:rgba(255,255,255,.06); border-bottom:1px solid var(--card-brd) }
+  .bbar .b{width:1.1cqw;height:1.1cqw;border-radius:50%}
+  .burl{ margin-left:1cqw; font-family:var(--mono); font-size:1.1cqw; color:var(--dim); background:rgba(0,0,0,.3); padding:.5cqw 1.2cqw; border-radius:.7cqw; flex:1 }
+  .bbody{ padding:1.8cqw }
+  .verdict{ display:flex; align-items:center; gap:1.4cqw; padding:1.6cqw; border-radius:1.1cqw; background:linear-gradient(90deg, rgba(255,92,157,.18), rgba(255,209,102,.1)); border:1px solid rgba(255,92,157,.35); margin-bottom:1.6cqw }
+  .score{ font-size:4cqw; font-weight:800; }
+  .result-row{ display:flex; align-items:center; gap:1.2cqw; padding:1.1cqw 0; border-bottom:1px solid rgba(255,255,255,.07) }
+  .result-row:last-child{border:0}
+  .result-row .ri{ font-size:2cqw; width:3cqw; text-align:center }
+  .result-row .rl{ font-weight:700; font-size:1.5cqw }
+  .result-row .rv{ margin-left:auto; font-size:1.4cqw; font-weight:700; padding:.4cqw 1.1cqw; border-radius:999px }
+  .badge-bad{ background:rgba(255,92,157,.2); color:#ff9bc2 } .badge-warn{ background:rgba(255,209,102,.18); color:#ffe0a3 } .badge-ok{ background:rgba(52,211,153,.18); color:#88f0c8 }
+
+  /* stack chips */
+  .stack{display:flex; flex-wrap:wrap; gap:1cqw}
+  .stack .t{ padding:.9cqw 1.6cqw; border-radius:1cqw; background:var(--card); border:1px solid var(--card-brd); font-weight:600; font-size:1.55cqw }
+
+  .footer-brand{ position:absolute; left:7%; bottom:4.4%; font-size:1.2cqw; color:var(--dim); font-weight:700; letter-spacing:.05em; display:flex; align-items:center; gap:.8cqw }
+  .footer-brand .lg{ width:1.6cqw;height:1.6cqw;border-radius:.4cqw; background:linear-gradient(135deg,var(--c1),var(--c3)) }
+
+  .hero-logo{ width:7cqw;height:7cqw;border-radius:1.8cqw; background:linear-gradient(135deg,var(--c1),var(--c3)); display:grid;place-items:center; font-size:4cqw; box-shadow:var(--glow); margin-bottom:2.5cqw }
+
+  /* ---- chrome / controls ---- */
+  .nav{ position:fixed; bottom:2.2vh; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:14px; z-index:50;
+    background:rgba(12,8,32,.6); border:1px solid rgba(255,255,255,.12); padding:8px 14px; border-radius:999px; backdrop-filter:blur(12px) }
+  .nav button{ background:none;border:0;color:var(--ink);cursor:pointer;font-size:16px; width:30px;height:30px;border-radius:50%; display:grid;place-items:center; transition:.2s }
+  .nav button:hover{ background:rgba(255,255,255,.12) }
+  .dots{ display:flex; gap:7px }
+  .dots i{ width:8px;height:8px;border-radius:50%; background:rgba(255,255,255,.25); cursor:pointer; transition:.25s }
+  .dots i.on{ background:linear-gradient(90deg,var(--c1),var(--c2)); width:22px; border-radius:999px }
+  .counter{ font-family:var(--mono); font-size:12px; color:var(--dim); min-width:44px; text-align:center }
+  .hint{ position:fixed; top:2vh; right:2vw; font-size:11px; color:var(--dim); z-index:50; font-family:var(--mono); opacity:.7 }
+  .progress{ position:absolute; top:0; left:0; height:.35cqw; background:linear-gradient(90deg,var(--c1),var(--c2),var(--c3)); z-index:20; transition:width .4s ease }
+
+  /* ---- PDF / print: one slide per landscape page (13.333in x 7.5in = 16:9) ---- */
+  @media print{
+    @page{ size:13.333in 7.5in; margin:0; }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    html,body{ height:auto; overflow:visible; display:block; }
+    body{ background:var(--bg1); }
+    .viewport{ display:block; width:auto; height:auto; }
+    .stage{ width:auto; height:auto; aspect-ratio:auto; box-shadow:none; border-radius:0; overflow:visible; }
+    .slides{ position:static; }
+    .slide{
+      position:relative !important; display:flex !important;
+      width:13.333in; height:7.5in; overflow:hidden;
+      border-radius:0; animation:none;
+      page-break-after:always; break-after:page;
+      background:
+        radial-gradient(1200px 800px at 15% -10%, rgba(124,92,255,.35), transparent 55%),
+        radial-gradient(1000px 700px at 95% 10%, rgba(56,189,248,.28), transparent 55%),
+        radial-gradient(1100px 900px at 50% 120%, rgba(255,92,157,.28), transparent 55%),
+        linear-gradient(160deg, var(--bg0), var(--bg1) 55%, var(--bg2));
+    }
+    .slide:last-of-type{ page-break-after:avoid; break-after:auto; }
+    .nav,.hint,.progress,.footer-brand{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="viewport">
+  <div class="stage" id="stage">
+    <div class="progress" id="prog"></div>
+    <div class="slides" id="slides">
+
+      <!-- 1 — TITLE (dev framing) -->
+      <section class="slide active" style="justify-content:center">
+        <div class="hero-logo">🛡️</div>
+        <div class="eyebrow">Open Source · Multi-Agent AI · MV3</div>
+        <h1 style="margin:.5cqw 0 2cqw">Disinfo<span class="grad">.</span>Analyzer</h1>
+        <p class="lead" style="max-width:64cqw">A hackable, self-hostable <b style="color:var(--ink)">multi-agent disinformation pipeline</b> — a FastAPI service orchestrating four CrewAI agents over fine-tuned transformers, streamed live into a Chrome MV3 extension.</p>
+        <div class="row wrap" style="margin-top:3cqw">
+          <span class="chip"><span class="dot" style="background:var(--c1)"></span> CrewAI + Gemini 2.5 Flash</span>
+          <span class="chip"><span class="dot" style="background:var(--c2)"></span> FastAPI · SSE streaming</span>
+          <span class="chip"><span class="dot" style="background:var(--c3)"></span> Docker → Cloud Run</span>
+        </div>
+        <p style="margin-top:2.4cqw; font-family:var(--mono); font-size:1.35cqw; color:var(--dim)">$ git clone github.com/&lt;org&gt;/disinfo-analyzer</p>
+      </section>
+
+      <!-- 2 — WHAT IT IS (TL;DR for engineers) -->
+      <section class="slide" style="justify-content:center">
+        <div class="eyebrow">TL;DR For Engineers</div>
+        <h2 style="margin:1cqw 0 2.4cqw; max-width:78cqw">You POST a page's HTML. You get a live <span class="grad">SSE stream</span> of per-agent verdicts back.</h2>
+        <div class="grid g3">
+          <div class="card" style="--a1:var(--c1);--a2:var(--c2)"><span class="icon">🧩</span><h3>Composable</h3><p style="margin-top:.8cqw">Each analysis dimension is a CrewAI <span style="font-family:var(--mono);color:var(--c2)">BaseTool</span> wrapping one HF model. Add or swap tools without touching the rest.</p></div>
+          <div class="card" style="--a1:var(--c2);--a2:var(--c5)"><span class="icon">🔒</span><h3>Stateless</h3><p style="margin-top:.8cqw">A fresh Crew is built per request — isolated state, safe concurrency, no cross-talk between analyses.</p></div>
+          <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><span class="icon">📡</span><h3>Streaming</h3><p style="margin-top:.8cqw">Server-Sent Events push status + result JSON as each agent finishes. No polling, no blocking waits.</p></div>
+        </div>
+      </section>
+
+      <!-- 3 — ARCHITECTURE OVERVIEW -->
+      <section class="slide">
+        <div class="eyebrow">Architecture</div>
+        <h2 style="margin:.6cqw 0 1.4cqw">Four layers, one <span class="grad">data path</span></h2>
+        <div class="fill center">
+          <div class="pipe" style="width:100%">
+            <div class="step"><div class="num">1</div><div class="st">Chrome MV3</div><div class="sd">activeTab · scripting · offscreen — grabs live tab HTML, calls the API</div></div>
+            <div class="step"><div class="num">2</div><div class="st">FastAPI</div><div class="sd">POST /analyze-html/ · Newspaper3k parse · builds a Crew per request</div></div>
+            <div class="step"><div class="num">3</div><div class="st">CrewAI Crew</div><div class="sd">4 agents run sequentially, reasoning via Gemini 2.5 Flash</div></div>
+            <div class="step"><div class="num">4</div><div class="st">HF Models</div><div class="sd">Each agent tool runs a fine-tuned transformer on PyTorch</div></div>
+          </div>
+        </div>
+        <div class="row wrap" style="justify-content:center; gap:1.2cqw">
+          <span class="chip">extension</span><span class="chip">↔ HTTP</span><span class="chip">↔ FastAPI</span><span class="chip">↔ CrewAI</span><span class="chip">↔ Transformers</span><span class="chip">↑ SSE back</span>
+        </div>
+      </section>
+
+      <!-- 4 — REQUEST LIFECYCLE / THE SSE STREAM -->
+      <section class="slide">
+        <div class="eyebrow">Request Lifecycle</div>
+        <h2 style="margin:.6cqw 0 1.4cqw">One request, a stream of <span class="grad2">events</span></h2>
+        <div class="row" style="gap:2.4cqw; flex:1">
+          <div class="card" style="flex:1.15;--a1:var(--c2);--a2:var(--c1)">
+            <pre style="font-family:var(--mono); font-size:1.28cqw; line-height:1.7; color:var(--muted); white-space:pre-wrap">
+<span style="color:var(--c4)">POST</span> /analyze-html/  <span style="color:var(--dim)">Content-Type: application/json</span>
+{ <span style="color:var(--c2)">"html"</span>: "&lt;!doctype html&gt;…" }
+
+<span style="color:var(--dim)">↓ text/event-stream</span>
+<span style="color:var(--c5)">event:</span> status  <span style="color:var(--c5)">data:</span> {"agent":"headline","state":"running"}
+<span style="color:var(--c5)">event:</span> result  <span style="color:var(--c5)">data:</span> {"agent":"headline", …}
+<span style="color:var(--c5)">event:</span> status  <span style="color:var(--c5)">data:</span> {"agent":"emotion","state":"running"}
+<span style="color:var(--c5)">event:</span> result  <span style="color:var(--c5)">data:</span> {"agent":"emotion", …}
+<span style="color:var(--dim)">…bias, conspiracy…</span>
+<span style="color:var(--c5)">event:</span> done    <span style="color:var(--c5)">data:</span> {"result": { …final JSON… }}</pre>
+          </div>
+          <div style="flex:.85; align-self:center">
+            <ul>
+              <li>Parse headline + body with Newspaper3k.</li>
+              <li>Instantiate a fresh, isolated Crew per request.</li>
+              <li>Agents run sequentially; each emits status then result.</li>
+              <li>Client renders incrementally — UI fills in as events arrive.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5 — AGENTS-AS-TOOLS PATTERN + MODELS TABLE -->
+      <section class="slide">
+        <div class="eyebrow">Agents-as-Tools Pattern</div>
+        <h2 style="margin:.6cqw 0 1.4cqw">Each agent wraps a <span class="grad">real model</span> as a BaseTool</h2>
+        <div class="grid g4" style="flex:1">
+          <div class="card agent" style="--a1:var(--c1);--a2:var(--c2)"><span class="icon">🎣</span><div class="tag">Headline Analyzer</div><p>XLM-RoBERTa multilingual clickbait model, softmax over the headline.</p><div class="out">semantic similarity / clickbait score</div></div>
+          <div class="card agent" style="--a1:var(--c2);--a2:var(--c5)"><span class="icon">🎭</span><div class="tag">Emotional Manipulation</div><p>cirimus/modernbert-base-go-emotions text-classification pipeline.</p><div class="out">top GoEmotions labels</div></div>
+          <div class="card agent" style="--a1:var(--c4);--a2:var(--c3)"><span class="icon">⚖️</span><div class="tag">Bias Detection</div><p>Faith1712/Political-bias-ModernBERT-base (MBIC), argmax over logits.</p><div class="out">Left / Center / Right</div></div>
+          <div class="card agent" style="--a1:var(--c3);--a2:var(--c1)"><span class="icon">🕵️</span><div class="tag">Conspiracy Detector</div><p>LLM-reasoned 7-trait conspiratorial framework (Vaccine/GMO/5G).</p><div class="out">trait-by-trait reasoning</div></div>
+        </div>
+        <p style="text-align:center; margin-top:.6cqw">Why per-request crews? <b style="color:var(--ink)">Isolated state</b> means safe concurrency — no shared memory bleeding one page's analysis into the next.</p>
+      </section>
+
+      <!-- 6 — THE API -->
+      <section class="slide">
+        <div class="eyebrow">The API</div>
+        <h2 style="margin:.6cqw 0 1.4cqw">Two endpoints. That's the <span class="grad2">whole surface.</span></h2>
+        <div class="row" style="gap:2.4cqw; flex:1">
+          <div class="card" style="flex:1;--a1:var(--c2);--a2:var(--c1)">
+            <h3 style="margin-bottom:1.2cqw">Contract</h3>
+            <pre style="font-family:var(--mono); font-size:1.3cqw; line-height:1.8; color:var(--muted); white-space:pre-wrap"><span style="color:var(--c4)">POST</span> /analyze-html/
+  req  { <span style="color:var(--c2)">"html"</span>: string }
+  res  <span style="color:var(--c5)">200</span> text/event-stream
+       (status → result ×4 → done)
+
+<span style="color:var(--c4)">GET</span>  /            <span style="color:var(--dim)"># health check</span>
+  res  <span style="color:var(--c5)">200</span> { "status": "ok" }</pre>
+          </div>
+          <div class="card" style="flex:1;--a1:var(--c3);--a2:var(--c4)">
+            <h3 style="margin-bottom:1.2cqw">Notes</h3>
+            <ul>
+              <li>CORS open — call it from any extension or origin.</li>
+              <li>Body is raw page HTML; server owns the parsing.</li>
+              <li><span style="font-family:var(--mono);color:var(--c2)">StreamingResponse</span> keeps the connection alive per agent.</li>
+              <li>Final <span style="font-family:var(--mono);color:var(--c2)">done</span> event carries the consolidated JSON result.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7 — EXTENDING IT -->
+      <section class="slide" style="justify-content:center">
+        <div class="eyebrow">Extending It</div>
+        <h2 style="margin:1cqw 0 2.4cqw; max-width:74cqw">Add an agent = add a <span class="grad">BaseTool + Task.</span></h2>
+        <div class="grid g3">
+          <div class="card" style="--a1:var(--c1);--a2:var(--c2)"><div class="tag" style="font-family:var(--mono);color:var(--c1);font-size:1.2cqw;letter-spacing:.1em">STEP 1</div><h3 style="margin:.8cqw 0">Wrap a model</h3><p>Subclass <span style="font-family:var(--mono);color:var(--c2)">BaseTool</span>, load your HF pipeline in <span style="font-family:var(--mono);color:var(--c2)">_run()</span>, return structured output.</p></div>
+          <div class="card" style="--a1:var(--c2);--a2:var(--c5)"><div class="tag" style="font-family:var(--mono);color:var(--c2);font-size:1.2cqw;letter-spacing:.1em">STEP 2</div><h3 style="margin:.8cqw 0">Wire an Agent + Task</h3><p>Give the agent the tool, describe the Task, append it to the sequential Crew — it slots into the SSE stream automatically.</p></div>
+          <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><div class="tag" style="font-family:var(--mono);color:var(--c3);font-size:1.2cqw;letter-spacing:.1em">SWAP</div><h3 style="margin:.8cqw 0">Change models freely</h3><p>Point a tool at a different HF checkpoint — the contract to the crew is just text in, JSON out.</p></div>
+        </div>
+      </section>
+
+      <!-- 8 — SELF-HOSTING & DEPLOY -->
+      <section class="slide">
+        <div class="eyebrow">Self-Hosting &amp; Deploy</div>
+        <h2 style="margin:.6cqw 0 1.4cqw">Clone, set a key, <span class="grad">ship it</span></h2>
+        <div class="row" style="gap:2.4cqw; flex:1">
+          <div class="card" style="flex:1;--a1:var(--c1);--a2:var(--c2)">
+            <h3 style="margin-bottom:1.2cqw">Run locally</h3>
+            <pre style="font-family:var(--mono); font-size:1.28cqw; line-height:1.85; color:var(--muted); white-space:pre-wrap"><span style="color:var(--dim)"># env</span>
+GEMINI_API_KEY=<span style="color:var(--c4)">your-key</span>
+
+<span style="color:var(--dim)"># build &amp; run</span>
+docker build -t disinfo .
+docker run -p 8000:8000 disinfo
+
+<span style="color:var(--dim)"># or deploy</span>
+gcloud run deploy disinfo \
+  --source . --region …</pre>
+          </div>
+          <div class="card" style="flex:1;--a1:var(--c2);--a2:var(--c5)">
+            <h3 style="margin-bottom:1.2cqw">Pipeline</h3>
+            <ul>
+              <li>Dockerized service — reproducible, no host Python setup.</li>
+              <li>CI/CD via GitHub Actions on push to main.</li>
+              <li>Deployed to Google Cloud Run — scales to zero.</li>
+              <li>Config by env var: Gemini key + model settings.</li>
+            </ul>
+            <div class="stack" style="margin-top:1.4cqw">
+              <span class="t">Docker</span><span class="t">GitHub Actions</span><span class="t">Cloud Run</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9 — PERFORMANCE & DESIGN NOTES -->
+      <section class="slide">
+        <div class="eyebrow">Performance &amp; Design Notes</div>
+        <h2 style="margin:.6cqw 0 1.8cqw">The <span class="grad2">trade-offs</span> we made on purpose</h2>
+        <div class="grid g3" style="flex:1; align-content:center">
+          <div class="card" style="--a1:var(--c1);--a2:var(--c2)"><span class="icon">📦</span><h3>Model loading</h3><p style="margin-top:.8cqw">Transformers + PyTorch dominate cold start — the image is heavy, so keep instances warm on Cloud Run.</p></div>
+          <div class="card" style="--a1:var(--c2);--a2:var(--c5)"><span class="icon">✂️</span><h3>Truncation</h3><p style="margin-top:.8cqw">Encoder models cap at their max sequence length; body text is truncated to fit before classification.</p></div>
+          <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><span class="icon">🌡️</span><h3>temperature 0.1</h3><p style="margin-top:.8cqw">Gemini 2.5 Flash runs near-deterministic — reasoning over model outputs stays stable and reproducible.</p></div>
+        </div>
+      </section>
+
+      <!-- 10 — ROADMAP -->
+      <section class="slide">
+        <div class="eyebrow">Roadmap</div>
+        <h2 style="margin:.6cqw 0 2cqw">Where the repo is headed</h2>
+        <div class="grid g3" style="flex:1; align-content:center">
+          <div class="card" style="--a1:var(--c5);--a2:var(--c2)"><div class="tag" style="font-family:var(--mono);color:var(--c5);font-size:1.2cqw;letter-spacing:.1em">NOW</div><h3 style="margin:.8cqw 0">Working MVP</h3><p>4 agents, SSE API, MV3 extension, containerized on Cloud Run.</p></div>
+          <div class="card" style="--a1:var(--c2);--a2:var(--c1)"><div class="tag" style="font-family:var(--mono);color:var(--c2);font-size:1.2cqw;letter-spacing:.1em">NEXT</div><h3 style="margin:.8cqw 0">Trust score + more models</h3><p>Aggregate a single 0–100 score; add classifiers for more manipulation dimensions.</p></div>
+          <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><div class="tag" style="font-family:var(--mono);color:var(--c3);font-size:1.2cqw;letter-spacing:.1em">LATER</div><h3 style="margin:.8cqw 0">Firefox port</h3><p>WebExtension build for Firefox, plus a stable public API for integrators.</p></div>
+        </div>
+      </section>
+
+      <!-- 11 — CONTRIBUTING / OPEN SOURCE -->
+      <section class="slide" style="justify-content:center">
+        <div class="eyebrow">Contributing · Open Source</div>
+        <h2 style="margin:1cqw 0 2.4cqw; max-width:76cqw">The pattern is the point — <span class="grad">fork it, extend it, PR it.</span></h2>
+        <div class="grid g3">
+          <div class="card center" style="text-align:center;--a1:var(--c1);--a2:var(--c2)"><span class="icon">🐛</span><h3>Open an issue</h3><p style="margin-top:.6cqw">Bug reports, model ideas, and false-positive examples are all gold.</p></div>
+          <div class="card center" style="text-align:center;--a1:var(--c2);--a2:var(--c3)"><span class="icon">🔀</span><h3>Send a PR</h3><p style="margin-top:.6cqw">New agent tools, model swaps, and extension fixes — the contract is stable.</p></div>
+          <div class="card center" style="text-align:center;--a1:var(--c3);--a2:var(--c4)"><span class="icon">🧪</span><h3>Bring datasets</h3><p style="margin-top:.6cqw">Better fine-tunes on Clickbait, GoEmotions, MBIC and beyond.</p></div>
+        </div>
+        <p style="text-align:center; margin-top:2cqw; font-family:var(--mono); font-size:1.35cqw; color:var(--dim)">github.com/&lt;org&gt;/disinfo-analyzer · MIT-friendly · PRs welcome</p>
+      </section>
+
+      <!-- 12 — CLOSE / CTA -->
+      <section class="slide" style="justify-content:center; align-items:center; text-align:center">
+        <div class="hero-logo" style="margin:0 auto 2.4cqw">🛡️</div>
+        <h2 style="max-width:76cqw">Real models. Isolated crews.<br><span class="grad">A stream you can build on.</span></h2>
+        <p class="lead" style="margin:2.4cqw 0; max-width:62cqw">Disinfo Analyzer is a small, honest architecture for a hard problem — and it's yours to run and extend.</p>
+        <div class="row center wrap">
+          <span class="chip"><span class="dot" style="background:var(--c4)"></span> ⭐ Star the repo</span>
+          <span class="chip"><span class="dot" style="background:var(--c2)"></span> github.com/&lt;org&gt;/disinfo-analyzer</span>
+          <span class="chip"><span class="dot" style="background:var(--c5)"></span> curl the /analyze-html/ endpoint</span>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="footer-brand"><span class="lg"></span> DISINFO ANALYZER</div>
+  </div>
+</div>
+
+<div class="hint">← → · Space · F fullscreen</div>
+
+<div class="nav">
+  <button id="prev" aria-label="Previous">‹</button>
+  <div class="dots" id="dots"></div>
+  <span class="counter" id="counter">01 / 12</span>
+  <button id="next" aria-label="Next">›</button>
+  <button id="full" aria-label="Fullscreen" title="Fullscreen">⛶</button>
+</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const dotsWrap = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  const prog = document.getElementById('prog');
+  let i = 0;
+  const n = slides.length;
+
+  slides.forEach((_, idx) => {
+    const d = document.createElement('i');
+    d.addEventListener('click', () => go(idx));
+    dotsWrap.appendChild(d);
+  });
+  const dots = [...dotsWrap.children];
+
+  function go(k){
+    i = Math.max(0, Math.min(n - 1, k));
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+    dots.forEach((d, idx) => d.classList.toggle('on', idx === i));
+    counter.textContent = String(i+1).padStart(2,'0') + ' / ' + String(n).padStart(2,'0');
+    prog.style.width = ((i)/(n-1)*100) + '%';
+  }
+  const next = () => go(i+1);
+  const prev = () => go(i-1);
+
+  document.getElementById('next').onclick = next;
+  document.getElementById('prev').onclick = prev;
+  document.getElementById('full').onclick = () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  };
+
+  addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){ e.preventDefault(); next(); }
+    else if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){ e.preventDefault(); prev(); }
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(n-1);
+    else if (e.key.toLowerCase() === 'f') document.getElementById('full').click();
+  });
+
+  // swipe
+  let sx=0;
+  addEventListener('touchstart', e => sx = e.touches[0].clientX, {passive:true});
+  addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - sx; if(Math.abs(dx)>50) dx<0?next():prev(); });
+
+  go(0);
+</script>
+</body>
+</html>

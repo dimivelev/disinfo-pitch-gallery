@@ -25,6 +25,10 @@ Each deck is a single, dependency-free `.html` file: 16:9, keyboard-navigable, a
 | [`decks/gradient-investors.html`](decks/gradient-investors.html) | Investors / VC |
 | [`decks/gradient-grant.html`](decks/gradient-grant.html) | Grant / policy / research funding |
 | [`decks/gradient-general.html`](decks/gradient-general.html) | General / all-purpose |
+| [`decks/gradient-enterprise.html`](decks/gradient-enterprise.html) | Enterprise / newsrooms & platforms (B2B) |
+| [`decks/gradient-education.html`](decks/gradient-education.html) | Educators / media literacy |
+| [`decks/gradient-government.html`](decks/gradient-government.html) | Government / regulators / public sector |
+| [`decks/gradient-developers.html`](decks/gradient-developers.html) | Developers / API & open source |
 
 ## Using a deck
 - **Navigate:** `←` `→`, `Space`, `PageUp/Down`, on-screen dots, or swipe.

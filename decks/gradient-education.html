@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disinfo Analyzer — Education</title>
+<style>
+  :root{
+    --bg0:#0b0620; --bg1:#160b3a; --bg2:#241155;
+    --ink:#f4f1ff; --muted:#b9b2e6; --dim:#8b83bd;
+    --c1:#7c5cff; --c2:#38bdf8; --c3:#ff5c9d; --c4:#ffd166; --c5:#34d399;
+    --card: rgba(255,255,255,.055);
+    --card-brd: rgba(255,255,255,.12);
+    --glow: 0 20px 70px -20px rgba(124,92,255,.55);
+    --ff: "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:var(--ff); color:var(--ink);
+    background:
+      radial-gradient(1200px 800px at 15% -10%, rgba(124,92,255,.35), transparent 55%),
+      radial-gradient(1000px 700px at 95% 10%, rgba(56,189,248,.28), transparent 55%),
+      radial-gradient(1100px 900px at 50% 120%, rgba(255,92,157,.28), transparent 55%),
+      linear-gradient(160deg, var(--bg0), var(--bg1) 55%, var(--bg2));
+    background-attachment:fixed;
+    overflow:hidden; display:grid; place-items:center; height:100vh;
+  }
+
+  /* ---- 16:9 stage that scales to viewport ---- */
+  .viewport{ width:100vw; height:100vh; display:grid; place-items:center; }
+  .stage{
+    position:relative;
+    width:min(100vw, 177.78vh);      /* 16:9 by width */
+    height:min(56.25vw, 100vh);      /* 16:9 by height */
+    aspect-ratio:16/9;
+    overflow:hidden;
+    border-radius:clamp(0px, 1.2vh, 22px);
+    box-shadow: var(--glow), 0 0 0 1px rgba(255,255,255,.05);
+  }
+
+  .slides{ position:absolute; inset:0; }
+  .slide{
+    position:absolute; inset:0;
+    padding: 6.2% 7%;
+    display:none;
+    flex-direction:column;
+    animation:fade .55s cubic-bezier(.2,.7,.2,1);
+    /* everything sized in cqw so it scales with the stage */
+    container-type:inline-size;
+  }
+  .slide.active{ display:flex; }
+  @keyframes fade{ from{opacity:0; transform:translateY(1.4cqw) scale(.995)} to{opacity:1; transform:none} }
+
+  /* type scale in container query width units */
+  .eyebrow{ font-size:1.35cqw; letter-spacing:.42em; text-transform:uppercase; color:var(--c2); font-weight:700; }
+  h1{ font-size:8.4cqw; line-height:.98; font-weight:800; letter-spacing:-.02em; }
+  h2{ font-size:5.2cqw; line-height:1.03; font-weight:800; letter-spacing:-.02em; }
+  h3{ font-size:2.3cqw; font-weight:700; letter-spacing:-.01em; }
+  p,li{ font-size:1.8cqw; line-height:1.5; color:var(--muted); }
+  .lead{ font-size:2.3cqw; color:var(--ink); font-weight:500; }
+  .grad{ background:linear-gradient(100deg,var(--c1),var(--c2) 45%,var(--c3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .grad2{ background:linear-gradient(100deg,var(--c4),var(--c3)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+
+  .fill{flex:1}
+  .row{display:flex; gap:2.4cqw}
+  .between{justify-content:space-between; align-items:center}
+  .center{align-items:center; justify-content:center}
+  .wrap{flex-wrap:wrap}
+
+  .chip{
+    display:inline-flex; align-items:center; gap:.6cqw;
+    padding:.7cqw 1.3cqw; border-radius:999px;
+    background:var(--card); border:1px solid var(--card-brd);
+    font-size:1.35cqw; color:var(--muted); font-weight:600;
+  }
+  .dot{width:.9cqw;height:.9cqw;border-radius:50%}
+
+  .card{
+    background:var(--card); border:1px solid var(--card-brd);
+    border-radius:1.6cqw; padding:2.4cqw;
+    backdrop-filter: blur(8px);
+    position:relative; overflow:hidden;
+  }
+  .card::before{ content:""; position:absolute; inset:0 0 auto 0; height:.35cqw; background:linear-gradient(90deg,var(--a1,var(--c1)),var(--a2,var(--c2))); opacity:.9 }
+
+  .grid{ display:grid; gap:2cqw; }
+  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+
+  .icon{ font-size:3cqw; line-height:1; display:block; margin-bottom:1cqw; }
+  .kpi{ font-size:5.4cqw; font-weight:800; line-height:1; letter-spacing:-.02em; }
+  .kpi-l{ font-size:1.5cqw; color:var(--dim); margin-top:.6cqw; text-transform:uppercase; letter-spacing:.12em; font-weight:700 }
+
+  ul{list-style:none; display:flex; flex-direction:column; gap:1.1cqw}
+  ul li{ position:relative; padding-left:2.6cqw; }
+  ul li::before{ content:"→"; position:absolute; left:0; color:var(--c2); font-weight:800 }
+
+  /* pipeline */
+  .pipe{ display:flex; align-items:stretch; gap:0; margin-top:1cqw }
+  .step{ flex:1; text-align:center; position:relative; padding:1.6cqw 1cqw }
+  .step .num{ width:3.4cqw;height:3.4cqw;border-radius:50%; margin:0 auto 1cqw; display:grid;place-items:center; font-weight:800; font-size:1.7cqw; background:linear-gradient(135deg,var(--c1),var(--c2)); color:#fff; box-shadow:0 8px 24px -6px rgba(124,92,255,.6) }
+  .step .st{ font-weight:700; font-size:1.65cqw; color:var(--ink); margin-bottom:.5cqw }
+  .step .sd{ font-size:1.3cqw; color:var(--dim) }
+  .step:not(:last-child)::after{ content:"›"; position:absolute; right:-1cqw; top:2.4cqw; font-size:3cqw; color:var(--c2); opacity:.6 }
+
+  /* agent tiles */
+  .agent .icon{ font-size:3.4cqw }
+  .agent .tag{ font-size:1.15cqw; font-family:var(--mono); color:var(--c2); text-transform:uppercase; letter-spacing:.1em }
+  .agent p{ font-size:1.45cqw; margin-top:.7cqw }
+  .agent .out{ margin-top:1.2cqw; font-size:1.3cqw; color:var(--dim); font-style:italic; border-left:.3cqw solid var(--card-brd); padding-left:1cqw }
+
+  /* demo mock */
+  .browser{ border-radius:1.4cqw; overflow:hidden; border:1px solid var(--card-brd); background:rgba(10,6,30,.6); box-shadow:0 30px 80px -30px #000 }
+  .bbar{ display:flex; gap:.8cqw; align-items:center; padding:1cqw 1.4cqw; background:rgba(255,255,255,.06); border-bottom:1px solid var(--card-brd) }
+  .bbar .b{width:1.1cqw;height:1.1cqw;border-radius:50%}
+  .burl{ margin-left:1cqw; font-family:var(--mono); font-size:1.1cqw; color:var(--dim); background:rgba(0,0,0,.3); padding:.5cqw 1.2cqw; border-radius:.7cqw; flex:1 }
+  .bbody{ padding:1.8cqw }
+  .verdict{ display:flex; align-items:center; gap:1.4cqw; padding:1.6cqw; border-radius:1.1cqw; background:linear-gradient(90deg, rgba(255,92,157,.18), rgba(255,209,102,.1)); border:1px solid rgba(255,92,157,.35); margin-bottom:1.6cqw }
+  .score{ font-size:4cqw; font-weight:800; }
+  .result-row{ display:flex; align-items:center; gap:1.2cqw; padding:1.1cqw 0; border-bottom:1px solid rgba(255,255,255,.07) }
+  .result-row:last-child{border:0}
+  .result-row .ri{ font-size:2cqw; width:3cqw; text-align:center }
+  .result-row .rl{ font-weight:700; font-size:1.5cqw }
+  .result-row .rv{ margin-left:auto; font-size:1.4cqw; font-weight:700; padding:.4cqw 1.1cqw; border-radius:999px }
+  .badge-bad{ background:rgba(255,92,157,.2); color:#ff9bc2 } .badge-warn{ background:rgba(255,209,102,.18); color:#ffe0a3 } .badge-ok{ background:rgba(52,211,153,.18); color:#88f0c8 }
+
+  /* stack chips */
+  .stack{display:flex; flex-wrap:wrap; gap:1cqw}
+  .stack .t{ padding:.9cqw 1.6cqw; border-radius:1cqw; background:var(--card); border:1px solid var(--card-brd); font-weight:600; font-size:1.55cqw }
+
+  .footer-brand{ position:absolute; left:7%; bottom:4.4%; font-size:1.2cqw; color:var(--dim); font-weight:700; letter-spacing:.05em; display:flex; align-items:center; gap:.8cqw }
+  .footer-brand .lg{ width:1.6cqw;height:1.6cqw;border-radius:.4cqw; background:linear-gradient(135deg,var(--c1),var(--c3)) }
+
+  .hero-logo{ width:7cqw;height:7cqw;border-radius:1.8cqw; background:linear-gradient(135deg,var(--c1),var(--c3)); display:grid;place-items:center; font-size:4cqw; box-shadow:var(--glow); margin-bottom:2.5cqw }
+
+  /* ---- chrome / controls ---- */
+  .nav{ position:fixed; bottom:2.2vh; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:14px; z-index:50;
+    background:rgba(12,8,32,.6); border:1px solid rgba(255,255,255,.12); padding:8px 14px; border-radius:999px; backdrop-filter:blur(12px) }
+  .nav button{ background:none;border:0;color:var(--ink);cursor:pointer;font-size:16px; width:30px;height:30px;border-radius:50%; display:grid;place-items:center; transition:.2s }
+  .nav button:hover{ background:rgba(255,255,255,.12) }
+  .dots{ display:flex; gap:7px }
+  .dots i{ width:8px;height:8px;border-radius:50%; background:rgba(255,255,255,.25); cursor:pointer; transition:.25s }
+  .dots i.on{ background:linear-gradient(90deg,var(--c1),var(--c2)); width:22px; border-radius:999px }
+  .counter{ font-family:var(--mono); font-size:12px; color:var(--dim); min-width:44px; text-align:center }
+  .hint{ position:fixed; top:2vh; right:2vw; font-size:11px; color:var(--dim); z-index:50; font-family:var(--mono); opacity:.7 }
+  .progress{ position:absolute; top:0; left:0; height:.35cqw; background:linear-gradient(90deg,var(--c1),var(--c2),var(--c3)); z-index:20; transition:width .4s ease }
+
+  /* ---- PDF / print: one slide per landscape page (13.333in x 7.5in = 16:9) ---- */
+  @media print{
+    @page{ size:13.333in 7.5in; margin:0; }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    html,body{ height:auto; overflow:visible; display:block; }
+    body{ background:var(--bg1); }
+    .viewport{ display:block; width:auto; height:auto; }
+    .stage{ width:auto; height:auto; aspect-ratio:auto; box-shadow:none; border-radius:0; overflow:visible; }
+    .slides{ position:static; }
+    .slide{
+      position:relative !important; display:flex !important;
+      width:13.333in; height:7.5in; overflow:hidden;
+      border-radius:0; animation:none;
+      page-break-after:always; break-after:page;
+      background:
+        radial-gradient(1200px 800px at 15% -10%, rgba(124,92,255,.35), transparent 55%),
+        radial-gradient(1000px 700px at 95% 10%, rgba(56,189,248,.28), transparent 55%),
+        radial-gradient(1100px 900px at 50% 120%, rgba(255,92,157,.28), transparent 55%),
+        linear-gradient(160deg, var(--bg0), var(--bg1) 55%, var(--bg2));
+    }
+    .slide:last-of-type{ page-break-after:avoid; break-after:auto; }
+    .nav,.hint,.progress,.footer-brand{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="viewport">
+  <div class="stage" id="stage">
+    <div class="progress" id="prog"></div>
+    <div class="slides" id="slides">
+
+      <!-- 1 — TITLE -->
+      <section class="slide active" style="justify-content:center">
+        <div class="hero-logo">🎓</div>
+        <div class="eyebrow">Media Literacy · Classroom-Ready AI</div>
+        <h1 style="margin:.5cqw 0 2cqw">Disinfo<span class="grad">.</span>Analyzer</h1>
+        <p class="lead" style="max-width:64cqw">A teaching tool that makes online manipulation <b style="color:var(--ink)">visible and explainable</b> — so students learn to spot clickbait, emotional manipulation, bias, and conspiracy tactics <b style="color:var(--ink)">on the pages they actually read</b>.</p>
+        <div class="row wrap" style="margin-top:3cqw">
+          <span class="chip"><span class="dot" style="background:var(--c1)"></span> For teachers &amp; schools</span>
+          <span class="chip"><span class="dot" style="background:var(--c2)"></span> Universities &amp; libraries</span>
+          <span class="chip"><span class="dot" style="background:var(--c3)"></span> Media-literacy programs</span>
+        </div>
+      </section>
+
+      <!-- 2 — WHY MEDIA LITERACY MATTERS NOW -->
+      <section class="slide">
+        <div class="eyebrow">Why This Matters Now</div>
+        <h2 style="margin:.8cqw 0 2cqw">Students live online — but can't always tell <span class="grad2">real from fake</span>.</h2>
+        <div class="row" style="gap:2cqw; flex:1">
+          <div class="grid g3" style="flex:1; align-content:start">
+            <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><div class="kpi grad2">2 in 3</div><div class="kpi-l">students struggle to judge if a source is trustworthy*</div></div>
+            <div class="card" style="--a1:var(--c1);--a2:var(--c2)"><div class="kpi">#1</div><div class="kpi-l">source of news for teens is a social feed, not an editor*</div></div>
+            <div class="card" style="--a1:var(--c2);--a2:var(--c5)"><div class="kpi">seconds</div><div class="kpi-l">is all a headline gets before a student scrolls on*</div></div>
+          </div>
+        </div>
+        <p class="lead" style="margin-top:1cqw">Manipulation is subtle — a loaded headline, an angry tone, a one-sided frame. <span class="grad">Literacy has to meet students where they read.</span></p>
+        <p style="font-size:1.2cqw; color:var(--dim); margin-top:.8cqw">*Illustrative figures for discussion — replace with your own program data.</p>
+      </section>
+
+      <!-- 3 — THE GAP -->
+      <section class="slide" style="justify-content:center">
+        <div class="eyebrow">The Gap</div>
+        <h2 style="margin:1cqw 0 2.4cqw; max-width:72cqw">Media literacy is taught in the classroom — but manipulation happens <span class="grad">at the point of reading</span>.</h2>
+        <div class="grid g2">
+          <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><h3>📚 Taught in theory</h3><p style="margin-top:1cqw">Worksheets and checklists live in the lesson. By the time a student opens a real article at home, the framework is gone.</p></div>
+          <div class="card" style="--a1:var(--c2);--a2:var(--c5)"><h3>💡 Learned in practice</h3><p style="margin-top:1cqw">Skills stick when students apply them live, on the exact page in front of them — with the technique named and explained in the moment.</p></div>
+        </div>
+      </section>
+
+      <!-- 4 — OUR APPROACH -->
+      <section class="slide">
+        <div class="eyebrow">Our Approach</div>
+        <h2 style="margin:.6cqw 0 2.4cqw; max-width:74cqw">A teaching tool, not a censor. We make the manipulation <span class="grad">visible</span> — students decide.</h2>
+        <div class="grid g3">
+          <div class="card center" style="text-align:center;--a1:var(--c1);--a2:var(--c2)"><span class="icon">🔎</span><h3>Visible</h3><p>Highlights the exact signals — clickbait, emotion, bias, conspiracy — on any live page.</p></div>
+          <div class="card center" style="text-align:center;--a1:var(--c2);--a2:var(--c3)"><span class="icon">🧠</span><h3>Explainable</h3><p>Every flag names a concept students can learn, discuss, and challenge — not a black-box "fake" label.</p></div>
+          <div class="card center" style="text-align:center;--a1:var(--c3);--a2:var(--c4)"><span class="icon">🕊️</span><h3>Empowering</h3><p>Builds critical thinking and agency. The tool informs the reader; it never blocks or decides for them.</p></div>
+        </div>
+      </section>
+
+      <!-- 5 — HOW IT WORKS -->
+      <section class="slide">
+        <div class="eyebrow">How It Works</div>
+        <h2 style="margin:.8cqw 0 1cqw">From a live tab to a teachable verdict in <span class="grad">four steps</span></h2>
+        <div class="fill center">
+          <div class="pipe" style="width:100%">
+            <div class="step"><div class="num">1</div><div class="st">Capture</div><div class="sd">The Chrome extension reads the page the student already has open</div></div>
+            <div class="step"><div class="num">2</div><div class="st">Parse</div><div class="sd">FastAPI extracts headline + article text with Newspaper3k</div></div>
+            <div class="step"><div class="num">3</div><div class="st">Analyze</div><div class="sd">Four CrewAI agents examine it in sequence, guided by Gemini 2.5 Flash</div></div>
+            <div class="step"><div class="num">4</div><div class="st">Explain</div><div class="sd">Findings stream back live for discussion via Server-Sent Events</div></div>
+          </div>
+        </div>
+        <div class="row wrap" style="justify-content:center; gap:1.2cqw">
+          <span class="chip">Open a page</span><span class="chip">→ analyze</span><span class="chip">→ live results</span><span class="chip">→ classroom talk</span>
+        </div>
+      </section>
+
+      <!-- 6 — THE 4 SIGNALS AS TEACHABLE CONCEPTS -->
+      <section class="slide">
+        <div class="eyebrow">Four Teachable Concepts · Powered by CrewAI</div>
+        <h2 style="margin:.6cqw 0 1.6cqw">A critical-thinking rubric <span class="grad">students can name</span>.</h2>
+        <div class="grid g4" style="flex:1">
+          <div class="card agent" style="--a1:var(--c1);--a2:var(--c2)"><span class="icon">🎣</span><div class="tag">Clickbait &amp; Headlines</div><p>Does the headline match the story? An XLM-RoBERTa model compares the two.</p><div class="out">"Ask: what did the title promise vs. deliver?"</div></div>
+          <div class="card agent" style="--a1:var(--c2);--a2:var(--c5)"><span class="icon">🎭</span><div class="tag">Emotional Manipulation</div><p>A GoEmotions ModernBERT model surfaces anger- or fear-driven language.</p><div class="out">"Ask: is this informing me or provoking me?"</div></div>
+          <div class="card agent" style="--a1:var(--c4);--a2:var(--c3)"><span class="icon">⚖️</span><div class="tag">Bias &amp; Framing</div><p>A ModernBERT model (trained on MBIC) flags a Left / Center / Right lean.</p><div class="out">"Ask: whose perspective is missing here?"</div></div>
+          <div class="card agent" style="--a1:var(--c3);--a2:var(--c1)"><span class="icon">🕵️</span><div class="tag">Conspiracy Traits</div><p>A 7-trait framework (Vaccine / GMO / 5G) becomes a checklist for reasoning.</p><div class="out">"Ask: which of the 7 traits appear?"</div></div>
+        </div>
+        <p style="text-align:center; margin-top:.4cqw">Each signal is a <b style="color:var(--ink)">real, fine-tuned model</b> — and a concept students can practise, debate, and transfer to any source.</p>
+      </section>
+
+      <!-- 7 — IN THE CLASSROOM -->
+      <section class="slide">
+        <div class="eyebrow">In The Classroom</div>
+        <h2 style="margin:.6cqw 0 1.4cqw">What a lesson looks like</h2>
+        <div class="row" style="gap:2.4cqw; flex:1">
+          <div class="browser" style="flex:1.2">
+            <div class="bbar"><span class="b" style="background:#ff5f57"></span><span class="b" style="background:#febc2e"></span><span class="b" style="background:#28c840"></span><span class="burl">news-site.com/breaking-story</span></div>
+            <div class="bbody">
+              <div class="verdict">
+                <div class="score grad2">Let's Look</div>
+                <div><h3 style="font-size:1.7cqw">Worth a closer read</h3><p style="font-size:1.3cqw">3 of 4 signals to discuss</p></div>
+              </div>
+              <div class="result-row"><span class="ri">🎣</span><span class="rl">Headline</span><span class="rv badge-bad">Clickbait?</span></div>
+              <div class="result-row"><span class="ri">🎭</span><span class="rl">Emotion</span><span class="rv badge-warn">Anger + Fear</span></div>
+              <div class="result-row"><span class="ri">⚖️</span><span class="rl">Bias</span><span class="rv badge-warn">One-sided</span></div>
+              <div class="result-row"><span class="ri">🕵️</span><span class="rl">Conspiracy</span><span class="rv badge-ok">No traits</span></div>
+            </div>
+          </div>
+          <div style="flex:.85; align-self:center">
+            <ul>
+              <li>Compare sources: run the same story on two sites, discuss the difference.</li>
+              <li>Spot the technique: hide the verdict, let students predict, then reveal.</li>
+              <li>Debate the flag: do you agree with the model? Defend your view.</li>
+              <li>Homework: analyse an article you chose and write up the signals.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8 — LEARNING OUTCOMES & ASSESSMENT -->
+      <section class="slide">
+        <div class="eyebrow">Learning Outcomes &amp; Assessment</div>
+        <h2 style="margin:.6cqw 0 2cqw">What students take away</h2>
+        <div class="grid g3" style="flex:1; align-content:center">
+          <div class="card" style="--a1:var(--c1);--a2:var(--c2)"><div class="icon">🎯</div><h3 style="margin:.4cqw 0">Recognise</h3><p>Students name the four signals unaided and point to them in a fresh article.</p></div>
+          <div class="card" style="--a1:var(--c2);--a2:var(--c5)"><div class="icon">🗣️</div><h3 style="margin:.4cqw 0">Reason</h3><p>They explain why a technique is persuasive — and when a flag is a false alarm.</p></div>
+          <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><div class="icon">📝</div><h3 style="margin:.4cqw 0">Assess</h3><p>Rubric-based source analysis, technique logs, and before/after literacy surveys.</p></div>
+        </div>
+        <p style="font-size:1.2cqw; color:var(--dim); margin-top:1.2cqw">Outcomes and rubric shown are illustrative placeholders — map them to your own standards and curriculum.</p>
+      </section>
+
+      <!-- 9 — PRIVACY & SAFEGUARDING -->
+      <section class="slide" style="justify-content:center">
+        <div class="eyebrow">Privacy &amp; Safeguarding</div>
+        <h2 style="margin:1cqw 0 2.4cqw; max-width:72cqw">Built for classrooms — <span class="grad">safe by design</span>.</h2>
+        <div class="grid g2">
+          <div class="card" style="--a1:var(--c2);--a2:var(--c5)"><h3>🔒 Only the page they open</h3><p style="margin-top:1cqw">Analyses just the article the student is reading, on request. No background scanning, no browsing history.</p></div>
+          <div class="card" style="--a1:var(--c1);--a2:var(--c2)"><h3>🚫 No tracking, no profiles</h3><p style="margin-top:1cqw">No student accounts required and no personal profiling. Each request is isolated — nothing about the reader is stored.</p></div>
+        </div>
+        <p style="text-align:center; margin-top:2cqw">Designed to sit comfortably inside school safeguarding and data-protection policies.</p>
+      </section>
+
+      <!-- 10 — ACCESS & ROLLOUT -->
+      <section class="slide">
+        <div class="eyebrow">Access &amp; Rollout</div>
+        <h2 style="margin:.6cqw 0 1.8cqw">Easy to bring into a school</h2>
+        <div class="row" style="gap:2.4cqw; flex:1">
+          <div class="card" style="flex:1;--a1:var(--c1);--a2:var(--c2)">
+            <h3 style="margin-bottom:1.4cqw">Free &amp; simple</h3>
+            <div class="stack">
+              <span class="t">Free Chrome extension</span><span class="t">One-click install</span><span class="t">No student login</span><span class="t">Works on any article</span>
+            </div>
+          </div>
+          <div class="card" style="flex:1;--a1:var(--c2);--a2:var(--c5)">
+            <h3 style="margin-bottom:1.4cqw">Ready for teachers</h3>
+            <ul>
+              <li>Curriculum notes mapping signals to lesson objectives</li>
+              <li>Ready-made activities: compare sources, spot the technique</li>
+              <li>Runs on Google Cloud Run — nothing to host at school</li>
+              <li>Guidance for parents and library / after-school use</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 11 — ROADMAP -->
+      <section class="slide">
+        <div class="eyebrow">What's Next</div>
+        <h2 style="margin:.6cqw 0 2cqw">From pilot to programme</h2>
+        <div class="grid g3" style="flex:1; align-content:center">
+          <div class="card" style="--a1:var(--c5);--a2:var(--c2)"><div class="tag" style="font-family:var(--mono);color:var(--c5);font-size:1.2cqw;letter-spacing:.1em">NOW</div><h3 style="margin:.8cqw 0">Classroom-ready tool</h3><p>Four signals, live analysis, free Chrome extension with starter activities.</p></div>
+          <div class="card" style="--a1:var(--c2);--a2:var(--c1)"><div class="tag" style="font-family:var(--mono);color:var(--c2);font-size:1.2cqw;letter-spacing:.1em">NEXT</div><h3 style="margin:.8cqw 0">Teacher dashboard</h3><p>Saved analyses, lesson packs, and a light rubric for tracking class progress.</p></div>
+          <div class="card" style="--a1:var(--c3);--a2:var(--c4)"><div class="tag" style="font-family:var(--mono);color:var(--c3);font-size:1.2cqw;letter-spacing:.1em">LATER</div><h3 style="margin:.8cqw 0">More browsers &amp; languages</h3><p>Firefox &amp; mobile, multilingual support, and integrations for LMS platforms.</p></div>
+        </div>
+      </section>
+
+      <!-- 12 — CLOSE / CTA -->
+      <section class="slide" style="justify-content:center; align-items:center; text-align:center">
+        <div class="hero-logo" style="margin:0 auto 2.4cqw">🎓</div>
+        <h2 style="max-width:76cqw">The feed won't slow down.<br><span class="grad">Teach students to read it critically.</span></h2>
+        <p class="lead" style="margin:2.4cqw 0; max-width:62cqw">Disinfo Analyzer turns four AI specialists into a live, explainable media-literacy coach for every reader in your classroom.</p>
+        <div class="row center wrap">
+          <span class="chip"><span class="dot" style="background:var(--c5)"></span> Pilot it in your classroom</span>
+          <span class="chip"><span class="dot" style="background:var(--c2)"></span> Free curriculum notes</span>
+          <span class="chip"><span class="dot" style="background:var(--c3)"></span> Let's talk</span>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="footer-brand"><span class="lg"></span> DISINFO ANALYZER</div>
+  </div>
+</div>
+
+<div class="hint">← → · Space · F fullscreen</div>
+
+<div class="nav">
+  <button id="prev" aria-label="Previous">‹</button>
+  <div class="dots" id="dots"></div>
+  <span class="counter" id="counter">01 / 12</span>
+  <button id="next" aria-label="Next">›</button>
+  <button id="full" aria-label="Fullscreen" title="Fullscreen">⛶</button>
+</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const dotsWrap = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  const prog = document.getElementById('prog');
+  let i = 0;
+  const n = slides.length;
+
+  slides.forEach((_, idx) => {
+    const d = document.createElement('i');
+    d.addEventListener('click', () => go(idx));
+    dotsWrap.appendChild(d);
+  });
+  const dots = [...dotsWrap.children];
+
+  function go(k){
+    i = Math.max(0, Math.min(n - 1, k));
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+    dots.forEach((d, idx) => d.classList.toggle('on', idx === i));
+    counter.textContent = String(i+1).padStart(2,'0') + ' / ' + String(n).padStart(2,'0');
+    prog.style.width = ((i)/(n-1)*100) + '%';
+  }
+  const next = () => go(i+1);
+  const prev = () => go(i-1);
+
+  document.getElementById('next').onclick = next;
+  document.getElementById('prev').onclick = prev;
+  document.getElementById('full').onclick = () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  };
+
+  addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){ e.preventDefault(); next(); }
+    else if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){ e.preventDefault(); prev(); }
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(n-1);
+    else if (e.key.toLowerCase() === 'f') document.getElementById('full').click();
+  });
+
+  // swipe
+  let sx=0;
+  addEventListener('touchstart', e => sx = e.touches[0].clientX, {passive:true});
+  addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - sx; if(Math.abs(dx)>50) dx<0?next():prev(); });
+
+  go(0);
+</script>
+</body>
+</html>
